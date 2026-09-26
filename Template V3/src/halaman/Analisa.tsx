@@ -757,6 +757,31 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
     return Math.round((gerak / level.entry) * 1000) / 10;
   })();
 
+  /* ── P/L YANG SUDAH TEREALISASI ───────────────────────────────────────
+     Diminta pemilik 26 Sep 2026: rak "Sudah selesai" menjanjikan rekam
+     jejak, tapi tiap kartunya cuma menulis "Expired · TP" — menang atau
+     kalah, tanpa SEBERAPA. Dua sinyal yang sama-sama kena TP bisa berbeda
+     empat kali lipat hasilnya, dan lencana yang sama untuk keduanya membuat
+     rak ini tidak bisa dipakai menilai apa pun selain winrate.
+
+     ── DIBACA DARI SERVER, TIDAK DIHITUNG ULANG DI SINI ────────────────
+     `hasilDolar` sudah dihitung server dengan model yang SAMA PERSIS dengan
+     `pnlJalan` di atas: R dikali $1.000 × 1% = $10 per R. Diperiksa
+     langsung di server.js — `MODAL_ESTIMASI = 1000`, `RISIKO_PERSEN = 1`,
+     dan RISIKO_SINYAL di berkas ini juga 10.
+
+     Itu bukan kebetulan yang enak, itu yang membuat angkanya nyambung:
+     sinyal yang kemarin menulis "P/L jalan +$14" lalu kena TP akan menulis
+     "P/L hasil +$14". Menghitungnya ulang di sini — dari entry/SL/TP yang
+     kebetulan ada di `level` — akan benar hari ini dan berselisih diam-diam
+     begitu salah satu sisi mengubah modelnya. Satu angka, satu pemiliknya.
+
+     Null dibiarkan kosong, tidak ditambal tebakan. Server menulis null
+     untuk yang dibatalkan (tidak ada uang yang berpindah) dan untuk yang
+     tidak bisa dinilai; menuliskannya nol akan terbaca sebagai impas. */
+  const pnlHasil = (a.hasil === 'tp' || a.hasil === 'sl')
+    && typeof a.hasilDolar === 'number' ? a.hasilDolar : null;
+
   return (
     /* `relative` wajib: lencana AI Agent duduk absolut di pojok panel. */
     /* flex-col + h-full: kartu mengisi tinggi raknya, bukan tinggi isinya.
@@ -1001,6 +1026,22 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 <span className={cn('angka font-semibold',
                   pnlJalan > 0 ? 'text-emerald-400' : pnlJalan < 0 ? 'text-red-400' : 'text-zinc-300')}>
                   {pnlJalan > 0 ? '+' : ''}{uang(pnlJalan)}
+                </span>
+              </span>
+            )}
+            {/* ── P/L HASIL ────────────────────────────────────────────────
+                Duduk di slot yang SAMA dengan "P/L jalan", dan itu
+                disengaja: satu kartu tidak pernah punya keduanya — yang
+                sudah selesai tidak berjalan lagi — jadi mata menemukan
+                angka itu di tempat yang sama sepanjang hidup sinyalnya,
+                cuma kata belakangnya yang berganti dari "jalan" ke
+                "hasil". */}
+            {pnlHasil !== null && (
+              <span title={`Hasil yang sudah terealisasi, dengan model risiko yang sama dengan papan peringkat: kena SL = −${uang(RISIKO_SINYAL)}. Bukan uangmu sungguhan — lotmu sendiri yang menentukan.`}>
+                P/L hasil{' '}
+                <span className={cn('angka font-semibold',
+                  pnlHasil > 0 ? 'text-emerald-400' : pnlHasil < 0 ? 'text-red-400' : 'text-zinc-300')}>
+                  {pnlHasil > 0 ? '+' : ''}{uang(pnlHasil)}
                 </span>
               </span>
             )}
