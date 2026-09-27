@@ -1,0 +1,69 @@
+# Sidik SHA-256 aset trabar2 yang TIDAK ikut ke repo
+# Diambil dari /root/ruang3d/trabar2 pada VPS, 27 Sep 2026.
+# 16 digit pertama sha256sum. Lihat BACA-DULU.md pasal 1 & 4.
+#
+# Cara memeriksa salinan lain:
+#   cd <folder trabar2> && find assets musik vendor -type f | sort | xargs sha256sum
+
+d7cd596bca21e484  assets/analyst-desks.glb
+32680fe88db092f0  assets/city-panorama.png
+b191e8245ce07f79  assets/navigation.json
+1baa87a57ae44878  assets/office-extension.glb
+bc40fbf6442a94bb  assets/office-extension.json
+e8de7d5f06b4da9b  assets/office-layout.json
+ef64a3a6b98f6ec7  assets/office.glb
+8d85bec44a18fe4a  assets/robot.glb
+5ecd0b6a5db660b9  assets/stair-office.glb
+418e6c9777d0da77  assets/stair-office.json
+46b5c846f36b3287  musik/disco-profit.mp3
+bc9925de50338b8b  musik/lagu-01.mp3
+d8ce54982dc860b7  musik/lagu-02.mp3
+d2ce72cab1a974dd  musik/lagu-03.mp3
+264c14eb3de45604  musik/lagu-04.mp3
+e6b1b640e4e8e095  musik/lagu-05.mp3
+c3d8d5409f094c50  musik/lagu-06.mp3
+02b7dd6c1566048d  musik/lagu-07.mp3
+18d3e94d48210958  musik/lagu-08.mp3
+84923a4de9288db2  musik/lagu-09.mp3
+6a90d64ab2f5c252  musik/lagu-10.mp3
+4355a741df725ccb  musik/lagu-11.mp3
+430c392c2ff83291  musik/lagu-12.mp3
+9e129d3f41b5c9a5  musik/lagu-13.mp3
+6ceb6d333fdabe25  musik/lagu-14.mp3
+e9f63448ab5766c7  musik/lagu-15.mp3
+ee22fed385b98329  musik/lagu-16.mp3
+02f69e0d178fd182  musik/lagu-17.mp3
+2597a9e7736a5e7b  musik/lagu-18.mp3
+25a8f34d9483e0c6  musik/lagu-19.mp3
+37a5acbae044bf0e  musik/lagu-20.mp3
+202c955ba57498af  musik/lagu-21.mp3
+bc80b95bab4b4318  musik/lagu-22.mp3
+329ed23f4f0968ec  musik/lagu-23.mp3
+abf2ddc8c30e3dbd  musik/lagu-24.mp3
+5a0f8f6873bcb396  musik/lagu-25.mp3
+f040e131199ba72b  musik/neon-shuffle.mp3
+484421de84e7ac4c  musik/pop-lock.mp3
+65e76e6c59033458  musik/stomp-rally.mp3
+4971f88118884062  musik/wave-groove.mp3
+b97879c748170baa  vendor/addons/controls/OrbitControls.js
+c20f0b4677f6128a  vendor/addons/environments/RoomEnvironment.js
+8acc50043aebc3ff  vendor/addons/lights/RectAreaLightTexturesLib.js
+494fef2d731ff168  vendor/addons/lights/RectAreaLightUniformsLib.js
+67ac5551fdafa6e3  vendor/addons/loaders/GLTFLoader.js
+dd1f3c42c1bc9fa1  vendor/addons/math/SimplexNoise.js
+4b8c855f28eed257  vendor/addons/postprocessing/EffectComposer.js
+7cd08eee9d5d6f55  vendor/addons/postprocessing/MaskPass.js
+f5b81c96e76b6b28  vendor/addons/postprocessing/OutputPass.js
+444b409c235ead98  vendor/addons/postprocessing/Pass.js
+fd91229aacc5830e  vendor/addons/postprocessing/RenderPass.js
+59944f833d10330f  vendor/addons/postprocessing/SSAOPass.js
+e2500a5913b26bbf  vendor/addons/postprocessing/ShaderPass.js
+d92742959879b461  vendor/addons/postprocessing/UnrealBloomPass.js
+a33057d5ac91c433  vendor/addons/shaders/CopyShader.js
+5044f780b6e6cf86  vendor/addons/shaders/LuminosityHighPassShader.js
+353479f77a8d7e26  vendor/addons/shaders/OutputShader.js
+57ec7cc10ad3b6a8  vendor/addons/shaders/SSAOShader.js
+fda7e946b8e0b5ab  vendor/addons/utils/BufferGeometryUtils.js
+0761b1e003917b21  vendor/addons/utils/SkeletonUtils.js
+eb077d2417f61d3e  vendor/three.core.js
+c8211c69345d2e99  vendor/three.module.js

@@ -1,0 +1,49 @@
+TRADING FLOOR — MINI ROBOT OFFICE SIMULATOR
+
+Robot model: “Mini Robot” by Onur
+https://sketchfab.com/3d-models/mini-robot-3454c84d6eff4a9dabbfadbfd1f56524
+https://sketchfab.com/onurpearl
+Licensed under Creative Commons Attribution 4.0 International:
+https://creativecommons.org/licenses/by/4.0/
+
+Modifications: skeleton rig, digital expression morphs, sample animation clips,
+typing animation, browser material adaptation, NPC behavior, navigation, camera
+controls, and market displays created with OpenAI Codex.
+
+Office: the interior reconstruction created earlier in this conversation from
+the user's supplied reference. Existing furniture and architectural layout reused.
+Market charts: public Hyperliquid prices and candles. Analyst performance and
+active signal summaries: public JadiTrader feeds. Demo and delayed states are
+identified in the interface. The decorative depth columns are illustrative.
+
+Rendering: Three.js 0.180.0, MIT license (see vendor/LICENSE).
+
+City window panorama: generated for the user as a flat architectural window texture,
+updated to morning daylight, September 2026. No exterior building geometry.
+The panorama is projected onto flat glazing with distant-view parallax,
+atmospheric haze and angle-dependent room reflections.
+
+Morning lighting update: directional window sunlight, stable ceiling shadow
+occlusion, recessed area lighting, satin oak relief, room reflection probe,
+contact occlusion and restrained light bloom. Three.js r180 official addons:
+https://github.com/mrdoob/three.js/tree/r180/examples/jsm
+
+Editable scene update: 159 individually named physical objects recovered from
+the original source model. Plant parts are joined per plant; furnishings and
+accessories are separate. Glass partitions, boundary clearance and navigation
+were repaired. Manual low, balanced and high rendering profiles were added.
+
+Office extension: supplied by the user as office-room.zip (FBX and chair textures).
+Adaptation: unified oak floor, physical entrance, furniture scale matching, missing-material restoration, separated objects and optimized geometry.
+Original office and robot attribution above remains applicable to those respective assets.
+
+Trading desks, monitors, keyboards, dance routines and data adapter: selected
+from the user's JadiTrader-TradingFloor-untuk-ChatGPT.zip. The uploaded duplicate
+room is omitted; only the requested workstation assets and behavior are reused.
+No music recordings were included in that upload.
+
+September 2026 update
+Analyst chair: chair_023.glb supplied by the site owner. Materials retained; shared mesh optimized for web.
+Music (currently disabled): five original deterministic instrumental arrangements are retained as inactive assets; see tools/compose_dance_music.py. The application does not load or play them. No existing commercial recordings or songs are bundled.
+Robot character voices (currently disabled): original Indonesian speech generated with Runway preset voices Xylar, Pip and Billy.
+Sound effects (currently disabled): locally synthesized footsteps, claps, swishes and event chimes.
