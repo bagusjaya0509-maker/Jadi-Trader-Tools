@@ -2,70 +2,57 @@ import type { OrderBursa } from '@/lib/admin';
 import { kunciPasar } from '@/lib/simbol';
 
 /* ════════════════════════════════════════════════════════════════════════
-   STOP NYASAR — SL/TP yang tidak menjaga apa pun
+   STOP NYASAR — SL/TP yang tertinggal tanpa posisi (YATIM)
    ════════════════════════════════════════════════════════════════════════
-   Di Binance Futures, SL dan TP bukan bagian dari order entry-nya. Mereka
-   order tersendiri yang menempel pada SIMBOL, bukan pada posisi. Akibatnya
-   dua hal bisa terjadi tanpa terlihat di mana pun:
+   Di Binance Futures dan Hyperliquid, SL dan TP bukan bagian dari order
+   entry-nya. Mereka order tersendiri yang menempel pada SIMBOL, bukan pada
+   posisi. Akibatnya posisinya bisa sudah tertutup (kena TP, ditutup
+   manual, atau pending-nya dibatalkan) sementara stop-nya masih hidup.
+   Hari ini ia tidak melakukan apa-apa. Lalu simbol yang sama dibuka lagi,
+   dan stop lama itu menembak posisi baru di harga yang sudah tidak relevan.
 
-   1. YATIM — posisinya sudah tertutup (kena TP, ditutup manual, atau
-      pending-nya dibatalkan) tapi stop-nya masih hidup. Hari ini ia tidak
-      melakukan apa-apa. Lalu simbol yang sama dibuka lagi, dan stop lama
-      itu menembak posisi baru di harga yang sudah tidak relevan.
+   Itu satu-satunya yang dilaporkan di sini: stop tanpa posisi DAN tanpa
+   pending order di simbol dan bursa yang sama.
 
-   2. MENUMPUK — SL diubah, yang baru terpasang, yang lama gagal atau lupa
-      dibatalkan. Sekarang ada dua SL yang masing-masing menutup SELURUH
-      posisi. Yang pertama kena menutup posisinya; yang kedua membuka
-      posisi BERLAWANAN sebesar itu juga.
+   ── "MENUMPUK" DICABUT 27 SEP 2026 ─────────────────────────────────
+   Dulu ada jenis kedua: dua SL/TP sejenis di posisi yang masih hidup,
+   dengan alasan SL ganda bisa membuka posisi BERLAWANAN — yang pertama
+   menutup posisi, yang kedua membuka arah sebaliknya.
 
-   ── MENUMPUK DINILAI DARI SIAPA YANG KENA DULUAN ─────────────────────
-   Versi pertama mengurutkan menurut WAKTU DIBUAT dan menganggap yang
-   lebih tua sudah "diganti". Dilaporkan pemilik 27 Sep 2026 lewat TAO di
-   Hyperliquid: dua kali entry, masing-masing dengan SL/TP sendiri —
+   Alasan itu tidak berlaku di sistem ini. Semua SL/TP yang dipasang
+   backend bersifat reduceOnly (Binance `reduceOnly: 'true'` di algoOrder,
+   Hyperliquid `r: true`), dan backend bahkan HANYA menggolongkan sebuah
+   order sebagai SL/TP kalau ia reduceOnly/closePosition — yang tidak,
+   dianggap order pembuka (pending). Order reduceOnly tidak bisa membuka
+   posisi, jadi stop tambahan paling jauh jadi cadangan yang diam.
 
-     entry 1   SL 222,36   TP 495,55   qty 0,123
-     entry 2   SL 173,80   TP 631,39   qty 0,319
+   Yang terjadi justru sebaliknya, dilaporkan pemilik lewat TAO di
+   Hyperliquid: dua kali entry dengan SL/TP masing-masing (SL 222,36 dan
+   173,80), lalu 75% posisi ditutup. Versi pertama menandai SL 222,36
+   "tidak menjaga apa pun" dan menawarkan membatalkannya — padahal itu stop
+   yang kena PERTAMA. Diperbaiki agar menilai siapa yang kena duluan, lalu
+   pemilik memutuskan peringatannya tidak diperlukan sama sekali selama
+   posisinya masih ada dan SL/TP-nya masih terpasang. Keputusan itu benar
+   karena alasan di atas: tidak ada bahaya yang tersisa untuk diperingatkan.
 
-   lalu 75% posisi ditutup, sisa 0,111. Pendeteksi lama menandai SL 222,36
-   "tidak menjaga apa pun" dan menawarkan membatalkannya — padahal justru
-   itu stop yang akan kena PERTAMA kalau harga turun. Mengikuti tombolnya
-   berarti melebarkan stop sisa posisi dari 222 ke 173.
-
-   Yang benar: urutkan menurut harga yang tersentuh lebih dulu. Stop yang
-   ditandai hanya yang TIDAK MUNGKIN kena, karena stop-stop yang lebih
-   dekat sudah menutup seluruh posisi lebih dulu. Membatalkannya tidak
-   pernah menambah risiko, apa pun urutan pembuatannya. Kasus lama yang
-   dijaga tetap tertangkap: SL yang digeser mendekat meninggalkan SL lama
-   yang lebih jauh, dan yang jauh itulah yang ditandai.
-
-   Yang TIDAK dianggap menumpuk: TP bertingkat. Metode TP1/TP2 memasang dua
-   TP yang masing-masing setengah posisi — jumlahnya pas, dan mematikan
-   salah satunya justru merusak rencana yang sengaja dibuat. Karena itu
-   ukurannya yang dijumlahkan, bukan barisnya yang dihitung.
+   Begitu posisinya tertutup, stop-stop tambahan itu otomatis menjadi
+   YATIM — dan saat itulah ia dilaporkan di sini, serta dibersihkan
+   penyapu di backend (sapu-stop.js).
    ════════════════════════════════════════════════════════════════════════ */
 
 export interface StopNyasar {
   order: OrderBursa;
-  sebab: 'yatim' | 'tumpuk';
+  sebab: 'yatim';
   /** Kalimat yang bisa langsung dibaca orang — dipakai di layar DAN di
    *  kotak konfirmasi, supaya yang dikatakan dan yang dibatalkan sama. */
   ket: string;
 }
 
 /* ── DIHITUNG PER BURSA, BUKAN PER SIMBOL ────────────────────────
-   FARTCOINUSDT terbuka di Binance DAN Hyperliquid sekaligus. Dikelompokkan
-   per simbol, TP Binance dan TP Hyperliquid bertemu di satu keranjang, lalu
-   penjaga "menumpuk" di bawah menyimpulkan salah satunya kelebihan — dan
-   menawarkan membatalkannya. Keduanya sah; yang keliru pengelompokannya.
-
-   Bahayanya nyata dan satu arah: tombol Bersihkan akan mencabut stop yang
-   benar-benar menjaga uang, di bursa yang bahkan tidak sedang dilihat. */
-/** Harga pemicu untuk kalimat di layar: tanpa nol berlebih, tanpa notasi
- *  ilmiah untuk koin receh. */
-function hargaTeks(n: number): string {
-  return '$' + n.toLocaleString('en-US', { maximumFractionDigits: n >= 1 ? 4 : 8 });
-}
-
+   FARTCOINUSDT bisa terbuka di Binance DAN Hyperliquid sekaligus. Kalau
+   dikelompokkan per simbol saja, posisi di satu bursa "menyelamatkan" stop
+   yatim di bursa lainnya — dan sebaliknya, stop yang sah bisa dilaporkan
+   yatim karena posisinya dicari di bursa yang salah. Kuncinya bursa+simbol. */
 export function cariStopNyasar(
   stop: OrderBursa[],
   posisi: { simbol: string; jumlah: number; bursa?: 'binance' | 'hyperliquid'; arah?: 'BUY' | 'SELL' }[],
@@ -78,53 +65,19 @@ export function cariStopNyasar(
     const milik = stop.filter((s) => kunciPasar(s.bursa, s.simbol) === k
                                      && (s.jenis === 'SL' || s.jenis === 'TP'));
     if (!milik.length) continue;
-    const pos = posisi.find((p) => kunciPasar(p.bursa, p.simbol) === k);
+    /* Baris posisi APA PUN di simbol+bursa ini cukup — termasuk yang
+       jumlahnya tidak terbaca (0). Lebih baik diam soal stop yang mungkin
+       masih menjaga sesuatu daripada menawarkan membatalkannya. */
+    const adaPosisi = posisi.some((p) => kunciPasar(p.bursa, p.simbol) === k);
+    /* Masih pending: stop-nya memang menunggu entry-nya jadi. Itu rencana
+       yang belum berjalan, bukan stop yatim. */
     const adaPending = pending.some((o) => kunciPasar(o.bursa, o.simbol) === k);
+    if (adaPosisi || adaPending) continue;
 
-    if (!pos && !adaPending) {
-      milik.forEach((o) => hasil.push({
-        order: o, sebab: 'yatim',
-        ket: 'tidak ada posisi maupun pending order di simbol ini',
-      }));
-      continue;
-    }
-    /* Masih pending: stop-nya memang menunggu entry-nya jadi. Itu bukan
-       tumpukan, itu rencana yang belum berjalan. */
-    if (!pos || pos.jumlah <= 0) continue;
-
-    /* Posisi LONG ditutup order SELL. Arah posisinya dipakai kalau
-       pemanggil memberikannya; kalau tidak, dibaca dari sisi order
-       penutupnya sendiri. */
-    const panjang = pos.arah ? pos.arah === 'BUY' : milik.every((o) => o.arah === 'SELL');
-
-    for (const jenis of ['SL', 'TP'] as const) {
-      /* Pemicu yang tidak diketahui tidak bisa diurutkan, jadi tidak pernah
-         ditandai — lebih baik diam daripada menawarkan membatalkan stop
-         yang tidak bisa dinilai. */
-      const sejenis = milik.filter((s) => s.jenis === jenis && s.pemicu > 0);
-      if (sejenis.length < 2) continue;
-      /* Kena duluan: SL long = pemicu TERTINGGI, TP long = TERENDAH;
-         posisi short kebalikannya. Pemicu sama persis: yang lebih baru
-         dianggap pengganti, yang lama yang ditandai. */
-      const naik = (jenis === 'SL') !== panjang;
-      sejenis.sort((a, b) => (a.pemicu === b.pemicu
-        ? b.dibuat - a.dibuat
-        : naik ? a.pemicu - b.pemicu : b.pemicu - a.pemicu));
-      const terdekat = sejenis[0];
-      let tertutup = 0;
-      for (const o of sejenis) {
-        if (tertutup >= pos.jumlah * 0.999) {
-          hasil.push({
-            order: o, sebab: 'tumpuk',
-            ket: `tidak akan pernah kena — ${jenis} di ${hargaTeks(terdekat.pemicu)} lebih dekat dan sudah menutup seluruh posisi`,
-          });
-          continue;
-        }
-        /* qty 0 berarti closePosition: satu order itu menutup berapa pun
-           besarnya posisi. */
-        tertutup += o.qty > 0 ? o.qty : pos.jumlah;
-      }
-    }
+    milik.forEach((o) => hasil.push({
+      order: o, sebab: 'yatim',
+      ket: 'tidak ada posisi maupun pending order di simbol ini',
+    }));
   }
   return hasil;
 }
