@@ -78,6 +78,15 @@ GAMBAR = {
         "/artikel/gambar/copy-trade-wallet-empat-angka-yang-menipu.webp",
     "penghasilan-tetap-dari-trading":
         "/artikel/gambar/penghasilan-tetap-dari-trading.webp",
+    # Tiga motif untuk artikel 27 Sep: candle yang terpotong di tengah,
+    # daftar yang menyempit, dan jarak entry ke stop loss. Dibuat
+    # skrip/buat-sampul-artikel.py, deterministik.
+    "cara-latihan-trading-dengan-chart-replay":
+        "/artikel/gambar/cara-latihan-trading-dengan-chart-replay.webp",
+    "cara-menyaring-pair-dengan-screener":
+        "/artikel/gambar/cara-menyaring-pair-dengan-screener.webp",
+    "cara-menentukan-stop-loss":
+        "/artikel/gambar/cara-menentukan-stop-loss.webp",
 }
 GAMBAR_BAWAAN = "/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp"
 
