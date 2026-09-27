@@ -1018,5 +1018,403 @@ export const ARTIKEL: Artikel[] = [
         "gambar": "/artikel/gambar/cara-membuat-jurnal-trading-di-excel.webp"
       }
     ]
+  },
+  {
+    "slug": "cara-latihan-trading-dengan-chart-replay",
+    "jenis": "fitur",
+    "judul": "Cara Latihan Trading dengan Chart Replay Tanpa Bisa Melihat Candle Berikutnya",
+    "ringkas": "Backtest biasa dikerjakan sambil melihat seluruh grafik sekaligus, dan di situlah hasilnya jadi terlalu bagus. Chart replay menutup bar yang belum terjadi, lalu memutarnya satu per satu.",
+    "menit": 3,
+    "gambar": "/artikel/gambar/cara-latihan-trading-dengan-chart-replay.webp",
+    "isi": [
+      {
+        "jenis": "p",
+        "isi": "Membuka grafik lama lalu menilai setup di dalamnya terasa seperti latihan. Masalahnya, seluruh pergerakan sesudah titik itu sudah tergambar di layar ketika kamu menilainya."
+      },
+      {
+        "jenis": "p",
+        "isi": "Otak tidak bisa pura-pura tidak melihat. Level yang kamu pilih cenderung level yang kebetulan bekerja, dan entry yang kamu bayangkan cenderung entry yang kebetulan selamat."
+      },
+      {
+        "jenis": "p",
+        "isi": "Chart replay memutus itu dengan cara paling sederhana: bar yang belum terjadi dipotong dari layar."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Apa yang berubah dibanding backtest biasa"
+      },
+      {
+        "jenis": "p",
+        "isi": "Pada backtest manual, kamu menggulir grafik dan menandai titik masuk. Pada replay, grafik berhenti di satu bar, dan bar berikutnya baru muncul setelah kamu menekan lanjut."
+      },
+      {
+        "jenis": "p",
+        "isi": "Keputusan jadi berurutan, sama seperti di market sungguhan. Kamu menentukan arah, stop loss, dan target sebelum tahu hasilnya."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Langkah menjalankannya"
+      },
+      {
+        "jenis": "ol",
+        "isi": [
+          "Buka halaman <b>Chart &amp; Entry</b>, lalu pilih simbol dan timeframe yang mau dilatih.",
+          "Nyalakan panel replay, lalu pilih bar awal. Seluruh bar sesudahnya langsung hilang dari layar.",
+          "Baca strukturnya seperti biasa: arah tren, level yang diuji, dan titik yang membatalkan idemu.",
+          "Buka tiket order. Ada tiga jenis entry, sama dengan yang dipakai di akun sungguhan: MARKET, LIMIT, dan STOP.",
+          "Tetapkan stop loss dan take profit, lalu kirim ordernya.",
+          "Jalankan bar berikutnya, satu per satu atau otomatis."
+        ]
+      },
+      {
+        "jenis": "p",
+        "isi": "Kecepatan putarnya bisa diatur satu kali, dua kali, empat kali, sepuluh kali, dan tiga puluh kali. Untuk latihan membaca struktur, kecepatan satu kali paling terasa mirip market. Kecepatan tinggi lebih cocok ketika kamu sekadar mengumpulkan sampel."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Stop loss bawaannya memakai ATR, bukan angka tetap"
+      },
+      {
+        "jenis": "p",
+        "isi": "Ketika tiket dibuka, level stop loss yang diusulkan dihitung dari ATR bar yang sedang tampil, dengan pengali 1,5. Target bawaannya dua kali risiko."
+      },
+      {
+        "jenis": "p",
+        "isi": "Alasannya sederhana. Angka mutlak tidak bisa dipakai lintas simbol: jarak yang wajar di BTC ratusan dolar, sementara di koin receh pecahan sen. Yang bisa menyeberang antar simbol cuma kelipatan volatilitasnya sendiri."
+      },
+      {
+        "jenis": "p",
+        "isi": "Angka usulan itu titik awal, bukan keputusan. Yang berlaku adalah level setelah kamu geser sendiri."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Catatan emosi dibuat sebelum hasilnya keluar"
+      },
+      {
+        "jenis": "p",
+        "isi": "Setiap order latihan bisa diberi catatan alasan dan kondisi emosi saat mengirimnya. Bagian ini yang biasanya dilewati, padahal ia satu-satunya data yang tidak bisa direkonstruksi belakangan."
+      },
+      {
+        "jenis": "p",
+        "isi": "Setelah sepuluh atau dua puluh transaksi, pola yang muncul biasanya bukan soal indikator. Yang muncul adalah entry yang dikirim saat terburu-buru, dan stop loss yang digeser saat posisi mulai merah."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Hasil latihan tidak masuk jurnal sungguhan"
+      },
+      {
+        "jenis": "p",
+        "isi": "Transaksi replay tersimpan sebagai sesi latihan yang terpisah, lengkap dengan kurva ekuitas dan ringkasannya sendiri. Ia tidak bercampur dengan jurnal akun MT5 maupun Binance."
+      },
+      {
+        "jenis": "p",
+        "isi": "Pemisahan itu disengaja. Statistik akun sungguhan kehilangan artinya kalau dicampur ratusan transaksi latihan yang risikonya tidak pernah nyata."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Cara memakainya supaya benar-benar terasa"
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "Tetapkan jumlah sampel sebelum mulai, misalnya 20 transaksi, lalu jangan berhenti di tengah karena hasilnya sedang jelek.",
+          "Pakai satu setup saja per sesi. Mencampur beberapa setup membuat hasilnya tidak bisa dibaca.",
+          "Tulis alasan entry sebelum menekan kirim, bukan sesudah bar berikutnya muncul.",
+          "Ulangi pada kondisi market yang berbeda, bukan cuma pada tren yang kebetulan searah."
+        ]
+      },
+      {
+        "jenis": "p",
+        "isi": "Semua yang dijelaskan di atas bisa dicoba tanpa membayar dan tanpa mendaftar lebih dulu lewat halaman pratinjau — akses penuh 24 jam."
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Halaman ini edukasi, bukan rekomendasi finansial. Hasil latihan tidak menjamin hasil di akun sungguhan, dan kerugian adalah kemungkinan yang nyata."
+      }
+    ],
+    "terkait": [
+      {
+        "slug": "cara-backtest-strategi-trading-gratis",
+        "judul": "Cara Backtest Strategi Trading Gratis di TradingView dan MT5",
+        "gambar": "/artikel/gambar/cara-backtest-strategi-trading-gratis.webp"
+      },
+      {
+        "slug": "cara-membuat-jurnal-trading-di-excel",
+        "judul": "Cara Membuat Jurnal Trading di Excel (dan Kapan Excel Mulai Merepotkan)",
+        "gambar": "/artikel/gambar/cara-membuat-jurnal-trading-di-excel.webp"
+      }
+    ]
+  },
+  {
+    "slug": "cara-menyaring-pair-dengan-screener",
+    "jenis": "fitur",
+    "judul": "Cara Menyaring Ratusan Pair Jadi Beberapa Kandidat dengan Screener",
+    "ringkas": "Membuka pair satu per satu terasa rajin, tetapi perhatianmu habis lebih dulu daripada marketnya. Screener membalik urutannya: saring dulu, baru buka chart.",
+    "menit": 2,
+    "gambar": "/artikel/gambar/cara-menyaring-pair-dengan-screener.webp",
+    "isi": [
+      {
+        "jenis": "p",
+        "isi": "Kebiasaan yang paling banyak memakan waktu bukan analisis, melainkan pencarian. Membuka pair satu per satu sambil berharap menemukan sesuatu terlihat seperti kerja keras."
+      },
+      {
+        "jenis": "p",
+        "isi": "Banyak trader menduga semakin banyak chart yang dibuka, semakin besar peluang menemukan setup bagus. Dugaan itu keliru. Ketika setup bagus akhirnya lewat, perhatianmu sudah terpakai habis."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Urutan kerja yang dibalik"
+      },
+      {
+        "jenis": "p",
+        "isi": "Screener memindai seluruh daftar simbol lebih dulu berdasarkan syarat yang kamu tetapkan, lalu memulangkan daftar pendek. Chart baru dibuka untuk nama yang lolos."
+      },
+      {
+        "jenis": "p",
+        "isi": "Hasilnya bukan sinyal entry. Hasilnya kandidat yang memenuhi syarat awal, dan analisisnya tetap kamu kerjakan sendiri."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Dua mode pindai, dan bedanya"
+      },
+      {
+        "jenis": "p",
+        "isi": "Mode pertama memantau terus-menerus. Pemindaian berjalan otomatis setiap kali filternya berubah, dan filternya dua: timeframe, lalu arah. Pilihan arahnya semua arah, hanya oversold untuk potensi BUY, atau hanya overbought untuk potensi SELL."
+      },
+      {
+        "jenis": "p",
+        "isi": "Mode kedua mencari jenis sinyal tertentu. Selain timeframe, kamu memilih jenis sinyalnya: sentuh SNR, yang menggabungkan channel dengan level support dan resistance, atau parallel saja tanpa level S/R."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Mempersempit daftar simbolnya"
+      },
+      {
+        "jenis": "p",
+        "isi": "Kelompok pair bisa dipersempit sebelum pindai dimulai, mulai dari major saja sampai seluruh daftar. Bisa juga dikunci ke satu mata uang: EUR, GBP, JPY, AUD, CAD, CHF, NZD, atau CNY."
+      },
+      {
+        "jenis": "p",
+        "isi": "Untuk yang memperhitungkan agenda berita, ada saringan dampak: seluruh dampak, atau tinggi dan sedang saja."
+      },
+      {
+        "jenis": "p",
+        "isi": "Filternya bersambung. Setiap pilihan yang kamu tambahkan muncul sebagai chip yang bisa dicabut satu per satu, jadi terlihat apa saja yang sedang menyaring dan mana yang membuat daftarnya kosong."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Chart yang lolos belum menjadi sinyal"
+      },
+      {
+        "jenis": "p",
+        "isi": "Satu hal perlu diluruskan. Simbol yang muncul di daftar baru memenuhi syarat teknikal yang kamu tulis, dan tidak lebih dari itu."
+      },
+      {
+        "jenis": "p",
+        "isi": "Yang masih harus diperiksa manual:"
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "Struktur harga di timeframe yang lebih besar.",
+          "Jarak stop loss yang masuk akal terhadap volatilitasnya.",
+          "Agenda berita yang bisa menggerakkan harga di luar teknikal.",
+          "Perbandingan potensi keuntungan terhadap risiko yang diambil."
+        ]
+      },
+      {
+        "jenis": "h2",
+        "isi": "Alur kerja yang dibuat tetap"
+      },
+      {
+        "jenis": "ol",
+        "isi": [
+          "Mulai dari screener, bukan dari chart.",
+          "Buka tiga sampai lima kandidat terbaik saja.",
+          "Lakukan analisis penuh pada kandidat itu.",
+          "Masukkan hanya setup valid ke watchlist.",
+          "Tutup sisanya tanpa dibuka."
+        ]
+      },
+      {
+        "jenis": "p",
+        "isi": "Urutan yang tidak berubah menjaga keputusan tetap rapi, dan mencegahmu berpindah chart hanya karena candle di layar terlihat menarik."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kalau filternya meloloskan terlalu banyak"
+      },
+      {
+        "jenis": "p",
+        "isi": "Uji selama satu minggu. Catat jumlah chart yang dibuka, kandidat yang lolos, setup valid, dan waktu yang habis untuk analisis."
+      },
+      {
+        "jenis": "p",
+        "isi": "Kalau daftarnya masih puluhan nama, syaratmu belum cukup sempit. Persempit timeframe-nya, atau kunci kelompok pair-nya, sampai daftarnya muat dibaca dalam sekali duduk."
+      },
+      {
+        "jenis": "p",
+        "isi": "Semua yang dijelaskan di atas bisa dicoba tanpa membayar dan tanpa mendaftar lebih dulu lewat halaman pratinjau — akses penuh 24 jam."
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Halaman ini edukasi, bukan rekomendasi finansial. Hasil pemindaian bukan ajakan membeli atau menjual, dan kerugian adalah kemungkinan yang nyata."
+      }
+    ],
+    "terkait": [
+      {
+        "slug": "cara-memasang-indikator-pine-di-tradingview",
+        "judul": "Cara Memasang Indikator Pine di TradingView (dan Satu Sebab Gagal yang Paling Sering)",
+        "gambar": "/artikel/gambar/cara-memasang-indikator-pine-di-tradingview.webp"
+      },
+      {
+        "slug": "cara-latihan-trading-dengan-chart-replay",
+        "judul": "Cara Latihan Trading dengan Chart Replay Tanpa Bisa Melihat Candle Berikutnya",
+        "gambar": "/artikel/gambar/cara-latihan-trading-dengan-chart-replay.webp"
+      }
+    ]
+  },
+  {
+    "slug": "cara-menentukan-stop-loss",
+    "jenis": "edukasi",
+    "judul": "Cara Menentukan Stop Loss yang Tidak Asal Jumlah Pip",
+    "ringkas": "Stop loss 20 pip di EURUSD dan 20 pip di XAUUSD adalah dua keputusan yang sama sekali berbeda. Jaraknya ditentukan struktur dan volatilitas, ukurannya ditentukan lot.",
+    "menit": 3,
+    "gambar": "/artikel/gambar/cara-menentukan-stop-loss.webp",
+    "isi": [
+      {
+        "jenis": "p",
+        "isi": "Stop loss paling sering dipasang dengan angka bulat yang gampang diingat. Dua puluh pip, lima puluh pip, satu dolar."
+      },
+      {
+        "jenis": "p",
+        "isi": "Angka bulat itu tidak tahu apa-apa tentang pair yang sedang kamu pegang. Dua puluh pip di EURUSD pada sesi sepi adalah jarak yang longgar; dua puluh pip di XAUUSD bisa habis dalam satu candle."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Pisahkan dua pertanyaan yang sering tercampur"
+      },
+      {
+        "jenis": "p",
+        "isi": "Pertanyaan pertama: di harga berapa ideku terbukti salah? Itu menentukan <b>jarak</b> stop loss."
+      },
+      {
+        "jenis": "p",
+        "isi": "Pertanyaan kedua: berapa rupiah yang boleh hilang kalau harga sampai ke sana? Itu menentukan <b>ukuran lot</b>."
+      },
+      {
+        "jenis": "p",
+        "isi": "Mencampur keduanya menghasilkan kesalahan yang paling umum: jarak stop loss dipersempit supaya lot-nya bisa besar. Level invalidasinya tidak berubah; yang berubah cuma peluang harga menyentuhnya lebih dulu."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Menentukan jaraknya dari struktur"
+      },
+      {
+        "jenis": "p",
+        "isi": "Cara pertama memakai titik yang membatalkan ide. Kalau kamu beli karena harga memantul di support, stop loss-nya di bawah support itu, bukan di angka bulat terdekat."
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "Beli setelah pantulan: stop di bawah swing low yang membentuk pantulannya.",
+          "Jual setelah penolakan: stop di atas swing high yang menolak.",
+          "Masuk setelah breakout: stop di sisi dalam level yang ditembus.",
+          "Masuk mengikuti tren: stop di luar koreksi terakhir yang masih menjaga arah tren."
+        ]
+      },
+      {
+        "jenis": "p",
+        "isi": "Beri jarak sedikit di luar titik itu. Stop yang ditaruh persis di harga swing paling sering tersapu justru pada bar yang kemudian berbalik ke arahmu."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Menentukan jaraknya dari volatilitas"
+      },
+      {
+        "jenis": "p",
+        "isi": "Cara kedua memakai ATR, yaitu rata-rata rentang pergerakan dalam sejumlah periode terakhir. Jaraknya ditulis sebagai kelipatan ATR, misalnya 1,5 kali ATR."
+      },
+      {
+        "jenis": "p",
+        "isi": "Keuntungannya, angka itu menyeberang antar simbol. Satu setengah ATR di BTC dan satu setengah ATR di EURUSD sama-sama berarti sedikit lebih longgar daripada gerak wajar hariannya, walaupun nilai rupiahnya jauh berbeda."
+      },
+      {
+        "jenis": "p",
+        "isi": "Keduanya bisa dipakai bersama. Ambil level struktur, lalu periksa apakah jaraknya masuk akal terhadap ATR. Kalau jaraknya jauh lebih sempit daripada ATR, stop itu terlalu rapat untuk pair tersebut."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Baru setelah itu hitung lot"
+      },
+      {
+        "jenis": "p",
+        "isi": "Urutannya tetap: tentukan jarak dulu, baru ukuran posisi."
+      },
+      {
+        "jenis": "ol",
+        "isi": [
+          "Tetapkan risiko per posisi dalam rupiah, misalnya satu persen dari modal.",
+          "Ukur jarak entry ke stop loss dalam pip atau poin.",
+          "Bagi risiko rupiah itu dengan nilai per pip, lalu hasilnya menjadi ukuran lot."
+        ]
+      },
+      {
+        "jenis": "p",
+        "isi": "Dengan urutan ini, stop yang lebih lebar tidak membuatmu rugi lebih besar. Ia cuma membuat lot-nya lebih kecil."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kalau merasa kena stop loss terus"
+      },
+      {
+        "jenis": "p",
+        "isi": "Keluhan itu hampir selalu berarti salah satu dari tiga hal, dan ketiganya kelihatan di jurnal:"
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "Jaraknya memang terlalu rapat terhadap volatilitas pair-nya.",
+          "Entry-nya terlalu jauh dari level, sehingga stop yang benar jadi terasa terlalu lebar dan akhirnya dipersempit.",
+          "Stop-nya digeser saat posisi berjalan, sehingga rugi kecil berubah jadi rugi besar."
+        ]
+      },
+      {
+        "jenis": "p",
+        "isi": "Yang ketiga paling merusak, dan paling sulit diakui. Menggeser stop menjauh berarti keputusan lama dibatalkan oleh rasa takut yang muncul belakangan."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Tulis aturannya sebelum entry"
+      },
+      {
+        "jenis": "p",
+        "isi": "Sebelum mengirim order, tulis tiga hal: harga invalidasi, kerugian maksimum dalam rupiah, dan kondisi yang melarang stop loss dipindahkan."
+      },
+      {
+        "jenis": "p",
+        "isi": "Saat posisi berjalan, kamu tinggal menjalankan keputusan lama. Itu jauh lebih mudah daripada bernegosiasi dengan rasa takut sambil melihat angka merah bergerak."
+      },
+      {
+        "jenis": "p",
+        "isi": "Semua yang dijelaskan di atas bisa dicoba tanpa membayar dan tanpa mendaftar lebih dulu lewat halaman pratinjau — akses penuh 24 jam."
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Halaman ini edukasi, bukan rekomendasi finansial. Tidak ada metode stop loss yang menjamin keuntungan, dan kerugian adalah kemungkinan yang nyata."
+      }
+    ],
+    "terkait": [
+      {
+        "slug": "cara-hitung-lot-forex-dan-akun-cent",
+        "judul": "Cara Hitung Lot Forex dari Risiko (dan Bedanya di Akun Cent)",
+        "gambar": "/artikel/gambar/cara-hitung-lot-forex-dan-akun-cent.webp"
+      },
+      {
+        "slug": "cara-latihan-trading-dengan-chart-replay",
+        "judul": "Cara Latihan Trading dengan Chart Replay Tanpa Bisa Melihat Candle Berikutnya",
+        "gambar": "/artikel/gambar/cara-latihan-trading-dengan-chart-replay.webp"
+      }
+    ]
   }
 ];
