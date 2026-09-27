@@ -18,6 +18,26 @@ import { kunciPasar } from '@/lib/simbol';
       posisi. Yang pertama kena menutup posisinya; yang kedua membuka
       posisi BERLAWANAN sebesar itu juga.
 
+   ── MENUMPUK DINILAI DARI SIAPA YANG KENA DULUAN ─────────────────────
+   Versi pertama mengurutkan menurut WAKTU DIBUAT dan menganggap yang
+   lebih tua sudah "diganti". Dilaporkan pemilik 27 Sep 2026 lewat TAO di
+   Hyperliquid: dua kali entry, masing-masing dengan SL/TP sendiri —
+
+     entry 1   SL 222,36   TP 495,55   qty 0,123
+     entry 2   SL 173,80   TP 631,39   qty 0,319
+
+   lalu 75% posisi ditutup, sisa 0,111. Pendeteksi lama menandai SL 222,36
+   "tidak menjaga apa pun" dan menawarkan membatalkannya — padahal justru
+   itu stop yang akan kena PERTAMA kalau harga turun. Mengikuti tombolnya
+   berarti melebarkan stop sisa posisi dari 222 ke 173.
+
+   Yang benar: urutkan menurut harga yang tersentuh lebih dulu. Stop yang
+   ditandai hanya yang TIDAK MUNGKIN kena, karena stop-stop yang lebih
+   dekat sudah menutup seluruh posisi lebih dulu. Membatalkannya tidak
+   pernah menambah risiko, apa pun urutan pembuatannya. Kasus lama yang
+   dijaga tetap tertangkap: SL yang digeser mendekat meninggalkan SL lama
+   yang lebih jauh, dan yang jauh itulah yang ditandai.
+
    Yang TIDAK dianggap menumpuk: TP bertingkat. Metode TP1/TP2 memasang dua
    TP yang masing-masing setengah posisi — jumlahnya pas, dan mematikan
    salah satunya justru merusak rencana yang sengaja dibuat. Karena itu
@@ -40,9 +60,15 @@ export interface StopNyasar {
 
    Bahayanya nyata dan satu arah: tombol Bersihkan akan mencabut stop yang
    benar-benar menjaga uang, di bursa yang bahkan tidak sedang dilihat. */
+/** Harga pemicu untuk kalimat di layar: tanpa nol berlebih, tanpa notasi
+ *  ilmiah untuk koin receh. */
+function hargaTeks(n: number): string {
+  return '$' + n.toLocaleString('en-US', { maximumFractionDigits: n >= 1 ? 4 : 8 });
+}
+
 export function cariStopNyasar(
   stop: OrderBursa[],
-  posisi: { simbol: string; jumlah: number; bursa?: 'binance' | 'hyperliquid' }[],
+  posisi: { simbol: string; jumlah: number; bursa?: 'binance' | 'hyperliquid'; arah?: 'BUY' | 'SELL' }[],
   pending: { simbol: string; bursa?: 'binance' | 'hyperliquid' }[],
 ): StopNyasar[] {
   const hasil: StopNyasar[] = [];
@@ -66,16 +92,31 @@ export function cariStopNyasar(
        tumpukan, itu rencana yang belum berjalan. */
     if (!pos || pos.jumlah <= 0) continue;
 
+    /* Posisi LONG ditutup order SELL. Arah posisinya dipakai kalau
+       pemanggil memberikannya; kalau tidak, dibaca dari sisi order
+       penutupnya sendiri. */
+    const panjang = pos.arah ? pos.arah === 'BUY' : milik.every((o) => o.arah === 'SELL');
+
     for (const jenis of ['SL', 'TP'] as const) {
-      /* Terbaru dulu — "pakai yang terbaru, hapus yang lama". */
-      const sejenis = milik.filter((s) => s.jenis === jenis).sort((a, b) => b.dibuat - a.dibuat);
+      /* Pemicu yang tidak diketahui tidak bisa diurutkan, jadi tidak pernah
+         ditandai — lebih baik diam daripada menawarkan membatalkan stop
+         yang tidak bisa dinilai. */
+      const sejenis = milik.filter((s) => s.jenis === jenis && s.pemicu > 0);
       if (sejenis.length < 2) continue;
+      /* Kena duluan: SL long = pemicu TERTINGGI, TP long = TERENDAH;
+         posisi short kebalikannya. Pemicu sama persis: yang lebih baru
+         dianggap pengganti, yang lama yang ditandai. */
+      const naik = (jenis === 'SL') !== panjang;
+      sejenis.sort((a, b) => (a.pemicu === b.pemicu
+        ? b.dibuat - a.dibuat
+        : naik ? a.pemicu - b.pemicu : b.pemicu - a.pemicu));
+      const terdekat = sejenis[0];
       let tertutup = 0;
       for (const o of sejenis) {
         if (tertutup >= pos.jumlah * 0.999) {
           hasil.push({
             order: o, sebab: 'tumpuk',
-            ket: `${jenis} lama — sudah ada ${jenis} lebih baru yang menutupi seluruh posisi`,
+            ket: `tidak akan pernah kena — ${jenis} di ${hargaTeks(terdekat.pemicu)} lebih dekat dan sudah menutup seluruh posisi`,
           });
           continue;
         }

@@ -350,6 +350,11 @@ export function usePosisi(): HasilData<Posisi[]> & {
    *  memendek diam-diam adalah kebohongan yang menenangkan — lihat catatan
    *  di `usePosisiBinance`. */
   gagalBursa: { binance: string | null; hyperliquid: string | null };
+  /** Pemeriksaan PERTAMA ke bursa belum selesai — panelnya menulis
+   *  "membaca", bukan "kosong" atau "catatan basi". */
+  memeriksaBursa: boolean;
+  /** Pembacaan terakhir gagal; yang tampil angka satu putaran sebelumnya. */
+  tersendat: boolean;
 } {
   const { pengguna, memuat: memuatAuth, pemilik } = useAuth();
   const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
@@ -397,7 +402,7 @@ export function usePosisi(): HasilData<Posisi[]> & {
      buka. Binance tidak mengirimkan keempatnya di rute posisi, jadi
      mengganti begitu saja akan menukar data yang lebih lengkap dengan yang
      lebih benar — padahal keduanya bisa dipakai bersama. */
-  const { data: bursa, order, aktif, memeriksa: memeriksaBursa, gagal: gagalBursa } = usePosisiBinance();
+  const { data: bursa, order, aktif, memeriksa: memeriksaBursa, gagal: gagalBursa, tersendat } = usePosisiBinance();
 
   /* Order ENTRY yang belum ke-fill: BELUM jadi posisi, jadi ia tidak
      boleh masuk daftar posisi — tapi juga tidak boleh hilang. Order yang
@@ -506,6 +511,7 @@ export function usePosisi(): HasilData<Posisi[]> & {
          seperti catatan sungguhan. */
       siaranPada: null, siaranBasi: false,
       gagalBursa: { binance: null, hyperliquid: null },
+      memeriksaBursa: false, tersendat: false,
       memuat: false, contoh: true, galat: null,
     };
   }
@@ -565,7 +571,14 @@ export function usePosisi(): HasilData<Posisi[]> & {
      dari Binance lewat App Token, dan dokumen publik cuma memasok SL/TP
      serta timeframe. Yang dijaga di sini hanya keadaan tanpa bursa, saat
      dokumen itu satu-satunya sumbernya. */
-  const basi = !aktif && siaranPada !== null
+  /* `!memeriksaBursa` ditambahkan 27 Sep 2026. Selama pemeriksaan pertama
+     `aktif` masih false — bukan karena bursanya tidak tersambung, tapi
+     karena jawabannya belum datang. Tanpa penjaga ini panelnya menulis
+     "catatan screener sudah lama" selama 0,3-7,5 detik tiap kali dipasang,
+     lalu posisinya muncul: kedipan yang dilaporkan pemilik. Daftarnya
+     sendiri sudah dikosongkan selama memeriksa (lihat `gabungan`); yang
+     terlewat cuma penanda basinya. */
+  const basi = !aktif && !memeriksaBursa && siaranPada !== null
     && Date.now() - siaranPada > UMUR_SIARAN_HIDUP;
 
   return {
@@ -583,6 +596,7 @@ export function usePosisi(): HasilData<Posisi[]> & {
     siaranPada,
     siaranBasi: basi,
     gagalBursa,
+    memeriksaBursa, tersendat,
     /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu
        data sungguhan, jadi labelnya hanya muncul kalau dokumennya memang
        belum ada. */

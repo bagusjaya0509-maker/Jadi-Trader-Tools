@@ -136,7 +136,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
    *  dan area untuk membelahnya. Lihat catatan di `ChartBanding`. */
   onBanding?: (b: BandingSalinan) => void;
 }) {
-  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif, siaranPada, siaranBasi, gagalBursa } = usePosisi();
+  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif, siaranPada, siaranBasi, gagalBursa, memeriksaBursa, tersendat } = usePosisi();
   /* Kapan tiap posisi kripto dibuka — dari riwayat isian di server, BUKAN
      dari `updateTime` positionRisk. Lihat catatan di /api/posisi-dibuka:
      `updateTime` ikut berubah tiap funding dibebankan, jadi tiga posisi
@@ -324,6 +324,8 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
           posisiKripto.map((p) => ({
             simbol: p.simbol, jumlah: p.jumlah ?? 0,
             bursa: bursaPosisi(p.venue) ?? undefined,
+            /* Menentukan stop mana yang kena duluan — lihat stop-nyasar.ts. */
+            arah: p.arah,
           })),
           pendingKripto)
       : []),
@@ -883,7 +885,9 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
              dibutuhkan — buka screener-nya, atau isi App Token supaya
              angkanya datang dari bursa dan bukan dari catatan. */
           kosong={sumber === 'kripto'
-            ? siaranBasi
+            ? memeriksaBursa
+              ? 'Membaca posisi dari bursa…'
+              : siaranBasi
               ? 'Catatan screener terakhir sudah lama dan tidak lagi diperbarui, jadi tidak ditampilkan sebagai posisi berjalan. Buka halaman Screener supaya siarannya hidup lagi, atau isi App Token agar posisinya dibaca langsung dari bursa.'
               : 'Tidak ada posisi kripto terbuka.'
             : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
@@ -901,6 +905,16 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
             memendek tanpa tanda terbaca sebagai "posisi saya sudah
             tertutup" — kebohongan yang menenangkan, dan orang berhenti
             memantau sesuatu yang masih hidup dan masih bisa rugi. */}
+        {/* Pembacaan terakhir gagal, tapi angka dari putaran sebelumnya
+            masih ditahan (lihat `tersendat` di usePosisiBinance). Disebut,
+            supaya angka yang sedikit tua tidak dibaca sebagai angka hidup. */}
+        {sumber === 'kripto' && bursaAktif && tersendat && (
+          <div className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-3 py-2 text-[11px] leading-relaxed text-amber-200/80">
+            Pembacaan terakhir ke bursa tidak terjawab — yang tampil angka dari pembacaan sebelumnya.
+            <span className="text-amber-200/55"> Dicoba lagi otomatis tiap 30 detik.</span>
+          </div>
+        )}
+
         {sumber === 'kripto' && bursaAktif
           && (gagalBursa.binance || gagalBursa.hyperliquid) && (
           <div className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-3 py-2 text-[11px] leading-relaxed text-amber-200/80">

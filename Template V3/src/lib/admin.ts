@@ -591,6 +591,46 @@ export async function bacaStopBursa(
   } catch { return null; }
 }
 
+/* ── POTRET TERAKHIR, DIBAGI SATU TAB ────────────────────────────────
+   Dilaporkan pemilik 27 Sep 2026: panel Posisi Terbuka — Kripto sering
+   hilang, diganti tulisan "catatan screener terakhir sudah lama", lalu
+   beberapa detik kemudian muncul lagi seperti semula.
+
+   Tiap panel yang dipasang memanggil hook ini dari NOL: aktif = false,
+   daftar kosong, lalu menunggu /api/posisi menjawab. Jawaban itu diukur
+   hari itu 0,26 sampai 7,5 detik (Binance + sebelas buku Hyperliquid).
+   Membuka Chart & Entry, berpindah halaman lalu kembali, atau apa pun yang
+   memasang ulang panelnya berarti menunggu selama itu lagi — padahal
+   angkanya sudah dibaca beberapa detik sebelumnya.
+
+   Jadi jawaban terakhir disimpan di tingkat modul, dan panel yang baru
+   dipasang langsung memakainya selagi pembacaan barunya berjalan.
+
+   DIKUNCI KE IDENTITAS PEMBACANYA. App Token dan login pemilik sama-sama
+   bisa membaca rute ini; potret dari satu identitas tidak boleh tampil
+   untuk identitas lain — misalnya sesudah keluar lalu masuk dengan akun
+   lain di tab yang sama. `auth.currentUser` sudah terisi selama aplikasi
+   berjalan, jadi pencocokannya bisa dilakukan seketika. Dua menit adalah
+   batas umurnya: cukup untuk bolak-balik halaman, tidak cukup untuk
+   memajang posisi yang sudah lama berubah. */
+interface PotretBursa {
+  pemilik: string;
+  data: PosisiBursa[];
+  order: OrderBursa[];
+  gagal: { binance: string | null; hyperliquid: string | null };
+  pada: number;
+}
+let potretBursa: PotretBursa | null = null;
+const UMUR_POTRET_MS = 120_000;
+function identitasBaca(token: string): string {
+  return token.trim() ? 't:' + token.trim() : 'u:' + (auth.currentUser?.uid ?? '');
+}
+function potretSah(token: string): PotretBursa | null {
+  const p = potretBursa;
+  if (!p || Date.now() - p.pada > UMUR_POTRET_MS) return null;
+  return p.pemilik === identitasBaca(token) ? p : null;
+}
+
 export function usePosisiBinance(): {
   data: PosisiBursa[];
   order: OrderBursa[];
@@ -615,20 +655,30 @@ export function usePosisiBinance(): {
    *  diam-diam adalah kebohongan yang menenangkan: orang berhenti memantau
    *  sesuatu yang sebenarnya masih hidup dan masih bisa rugi. */
   gagal: { binance: string | null; hyperliquid: string | null };
+  /** Pembacaan TERAKHIR gagal, dan yang tampil adalah angka dari pembacaan
+   *  berhasil sebelumnya (paling lama satu putaran). Lihat catatan di
+   *  cabang `catch` di bawah. */
+  tersendat: boolean;
   /** Paksa baca ulang sekarang, tanpa menunggu putaran 30 detik.
    *  Dipakai setelah mengubah order: menunggu satu putaran penuh membuat
    *  layar bilang "berhasil" sementara tabelnya masih menampilkan angka
    *  lama — dan selisih itu terbaca sebagai kegagalan. */
   segarkan: () => void;
 } {
-  const [data, setData] = useState<PosisiBursa[]>([]);
-  const [order, setOrder] = useState<OrderBursa[]>([]);
-  const [aktif, setAktif] = useState(false);
+  /* Dibaca SEKALI saat panel dipasang — lihat `potretBursa` di atas. */
+  const [awal] = useState(() => potretSah(bacaKoneksi().token));
+  const [data, setData] = useState<PosisiBursa[]>(awal?.data ?? []);
+  const [order, setOrder] = useState<OrderBursa[]>(awal?.order ?? []);
+  const [aktif, setAktif] = useState(!!awal);
   const [funding, setFunding] = useState<Map<string, number | null>>(new Map());
-  const [memeriksa, setMemeriksa] = useState(true);
+  const [memeriksa, setMemeriksa] = useState(!awal);
   const [gagal, setGagal] = useState<{ binance: string | null; hyperliquid: string | null }>(
-    { binance: null, hyperliquid: null });
-  const sudahPertama = useRef(false);
+    awal?.gagal ?? { binance: null, hyperliquid: null });
+  const [tersendat, setTersendat] = useState(false);
+  const sudahPertama = useRef(!!awal);
+  /** Pernah dijawab bursa di panel ini (atau mewarisi potret yang sah). */
+  const sudahBerhasil = useRef(!!awal);
+  const gagalBeruntun = useRef(0);
   const { token } = bacaKoneksi();
   const [pemicu, setPemicu] = useState(0);
   /** Sudah pernah dijawab 403 — jalur login ditutup untuk sesi ini. */
@@ -673,11 +723,11 @@ export function usePosisiBinance(): {
         const kepala = await kepalaBaca();
         /* Tidak ada satu pun cara masuk — jawabannya sudah pasti sekarang
            juga, jadi jangan menahan pemanggil menunggu. */
-        if (!kepala) { setAktif(false); setData([]); setMemeriksa(false); return; }
+        if (!kepala) { potretBursa = null; setAktif(false); setData([]); setMemeriksa(false); return; }
         const r = await fetch(`${dasar()}/api/positions`, { headers: kepala });
         /* 403 = login sah tapi bukan pemilik. Bukan galat sesaat yang layak
            dicoba lagi; jawabannya akan sama selamanya. */
-        if (r.status === 403) { bukanPemilik.current = true; setAktif(false); setData([]); setMemeriksa(false); return; }
+        if (r.status === 403) { bukanPemilik.current = true; potretBursa = null; setAktif(false); setData([]); setMemeriksa(false); return; }
         if (!r.ok) throw new Error(String(r.status));
         const j = await r.json();
         if (!hidup) return;
@@ -686,6 +736,9 @@ export function usePosisiBinance(): {
            menggagalkan posisi: daftar posisi tanpa SL masih berguna, daftar
            posisi yang hilang sama sekali tidak. */
         const stop = new Map<string, { sl: number; tp: number }>();
+        let orderBaru: OrderBursa[] | null = null;
+        let posisiBaru: PosisiBursa[] = [];
+        let gagalBaru: { binance: string | null; hyperliquid: string | null } = { binance: null, hyperliquid: null };
         try {
           const ro = await fetch(`${dasar()}/api/open-orders`, { headers: kepala });
           if (ro.ok) {
@@ -708,7 +761,7 @@ export function usePosisiBinance(): {
                bisa menjawab "ada berapa order" — dua order di simbol yang
                sama menyusut jadi satu angka. Chart butuh yang kedua untuk
                menggambar satu garis per order. */
-            if (hidup) setOrder((jo.daftar ?? []).map((o: any): OrderBursa => ({
+            if (hidup) setOrder(orderBaru = (jo.daftar ?? []).map((o: any): OrderBursa => ({
               id: String(o.id ?? ''),
               simbol: String(o.simbol ?? ''),
               jenis: (o.jenis ?? 'LAIN') as OrderBursa['jenis'],
@@ -726,7 +779,7 @@ export function usePosisiBinance(): {
         /* Binance mengirim SATU baris untuk setiap simbol yang pernah
            disentuh — 858 baris untuk tiga posisi. Yang qty-nya nol bukan
            posisi; menampilkannya berarti daftar sepanjang ratusan baris. */
-        setData((j.positions ?? [])
+        setData(posisiBaru = (j.positions ?? [])
           .filter((p: any) => Math.abs(Number(p.positionAmt)) > 0)
           .map((p: any): PosisiBursa => {
             /* Bawaannya 'binance' — itu yang benar untuk jawaban lama yang
@@ -750,13 +803,41 @@ export function usePosisiBinance(): {
           }));
         /* Dibaca dari jawaban yang SAMA dengan posisinya, supaya
            tandanya tidak pernah bercerita soal putaran yang berbeda. */
-        setGagal({
+        setGagal(gagalBaru = {
           binance: j?.gagalBinance ? String(j.gagalBinance) : null,
           hyperliquid: j?.gagalHl ? String(j.gagalHl) : null,
         });
         setAktif(true);
+        setTersendat(false);
+        sudahBerhasil.current = true;
+        gagalBeruntun.current = 0;
+        /* Order yang gagal dibaca putaran ini tidak mengosongkan potret:
+           state `order` di panel juga tidak diubah dalam keadaan itu. */
+        potretBursa = {
+          pemilik: identitasBaca(kepala['X-App-Token'] ?? ''),
+          data: posisiBaru,
+          order: orderBaru ?? potretBursa?.order ?? [],
+          gagal: gagalBaru,
+          pada: Date.now(),
+        };
       } catch {
-        if (hidup) { setAktif(false); }
+        /* ── SATU PUTARAN GAGAL BUKAN BURSA PUTUS ────────────────────
+           Dulu satu kegagalan saja (koneksi tersendat, jawaban telat
+           ditolak di jalan) langsung mematikan `aktif`. Panelnya jatuh ke
+           siaran screener yang sudah basi, menulis "catatan sudah lama",
+           lalu pulih sendiri di putaran berikutnya — kedipan yang
+           terbaca sebagai posisi hilang.
+
+           Sekarang angka terakhir TETAP tampil selama satu putaran, dengan
+           tanda `tersendat` yang disebut di layar. Baru kalau dua putaran
+           berturut-turut gagal (±60 detik) panelnya dinyatakan putus.
+           Panel yang belum pernah dijawab bursa sama sekali tidak punya
+           angka untuk dipertahankan, jadi langsung dinyatakan putus. */
+        if (hidup) {
+          gagalBeruntun.current += 1;
+          if (!sudahBerhasil.current || gagalBeruntun.current >= 2) { setAktif(false); setTersendat(false); }
+          else setTersendat(true);
+        }
       } finally {
         /* Berhasil maupun gagal, pemeriksaannya SELESAI — dan jawaban
            "tidak tersambung" sama sahihnya dengan "tersambung". */
@@ -829,7 +910,7 @@ export function usePosisiBinance(): {
     window.addEventListener('jt:order-nyata-berubah', dengar);
     return () => { window.removeEventListener('jt:order-nyata-berubah', dengar); if (t) clearTimeout(t); };
   }, []);
-  return { data: dataFunding, order, aktif, memeriksa, gagal, segarkan: () => setPemicu((n) => n + 1) };
+  return { data: dataFunding, order, aktif, memeriksa, gagal, tersendat, segarkan: () => setPemicu((n) => n + 1) };
 }
 
 /** Unggah satu gambar ke VPS, dapat URL publiknya.
