@@ -87,6 +87,34 @@ let laguPilihan=(function(){
   return Number.isFinite(v)&&v>=0&&v<LAGU.length?v:-1;
 })();
 function laguSekarang(){return laguPilihan>=0?LAGU[laguPilihan]:BAWAAN[joget.gerakan];}
+/* ── LAGU HABIS = PANGGUNG BUBAR ─────────────────────────────────────
+   Diminta pemilik 27 Sep 2026. "Lagunya habis" berarti tiga hal yang
+   berbeda, tergantung mode:
+
+     Lagu pilihan (1-25)         diputar SEKALI; habis -> bubar.
+     Otomatis, gerakan dikunci   pengiring gerakan itu diputar sekali;
+                                 habis -> bubar.
+     Otomatis, bergantian        pengiringnya berganti tiap gerakan dan
+                                 tidak pernah sampai ujung, jadi yang
+                                 dihitung PUTARAN: sepuluh gerakan
+                                 selesai -> bubar.
+
+   Satu pengecualian: lagu yang habis SEBELUM penarinya sampai di panggung
+   diulang dari awal, bukan membubarkan. Ada lagu 12 detik di daftar,
+   sedangkan robot terjauh butuh sampai 14 detik untuk tiba — tanpa
+   pengecualian ini mereka berjalan ke panggung lalu langsung pulang.
+
+   Bisa dimatikan dari menu Joget ("Berhenti saat lagu habis"). Mati =
+   perilaku lama: lagu diulang terus sampai panggung ditutup tangan. */
+let jogetBerhentiHabis=(function(){try{return localStorage.getItem('jt.trabar.jogetHabis')!=='0';}catch(e){return true;}})();
+let modeSebelumJoget=null;
+musik.setUlang(!jogetBerhentiHabis);
+musik.onHabis=()=>{
+  if(!joget.aktif||!jogetBerhentiHabis)return;
+  const medley=laguPilihan<0&&joget.kunci===null;
+  if(joget.fase!=='joget'||medley){musik.dariAwal();return;}
+  tutupPanggung('Lagu selesai — robot kembali ke meja.',true);
+};
 const performanceAudio=new PerformanceAudio(),beatCamera=new BeatCamera();
 let scene,camera,renderer,controls,pasca,nav,npcs=[],office,layout,tween=null,tourIndex=0,tourTimer=0,wallMeshes=[],screens=[],pickTargets=[],frame=0,lastUI=0,lastScreen=-10,giliranLayar=0,followPrevious=null,lastTime=performance.now(),interacting=false;
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z),raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
@@ -1165,9 +1193,176 @@ const presets={
   stairs:()=>({position:V(-6.8,3.3,5.4),target:V(-15,2.1,-.9),label:'Kantor kiri · ruang bertangga'}),
 };
 
+/* ── SUDUT KAMERA SENDIRI & AUTO TOUR YANG BISA DIATUR ───────────────
+   Dilaporkan pemilik 27 Sep 2026: sudut auto tour "itu itu saja dan tidak
+   variatif". Diukur dari kodenya, memang begitu: delapan bidikan dengan
+   urutan terkunci, sepuluh detik masing-masing, putaran pelan yang sama
+   persis — dan "Trading desk" serta "Tampak atas" tidak pernah ikut.
+
+   Yang ditambahkan:
+     1. Sudut sendiri. Bingkai kamera di mode Bebas, beri nama, simpan.
+        Tersimpan di peramban ini dan langsung ikut auto tour.
+     2. Tour bisa diatur: sudut mana yang ikut, lama tiap sudut, urutan
+        berurutan atau acak.
+     3. Gerak kamera bervariasi: tiap bidikan memilih sendiri arah dan laju
+        putarnya, dan apakah kamera mendekat, menjauh, atau diam. Bidikan
+        robot memilih robot dan sisi yang berlainan.
+
+   Bidikan di area yang sedang disembunyikan (Perluasan kantor, Lantai
+   atas) dilewati — tanpa itu tour berhenti sepuluh detik menatap ruangan
+   yang tidak digambar. */
+const KUNCI_SUDUT='jt.trabar.sudutKustom',KUNCI_TUR='jt.trabar.tur';
+function bacaJSON(k,awal){try{const v=JSON.parse(localStorage.getItem(k)||'null');return v??awal;}catch(e){return awal;}}
+function tulisJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+let sudutKustom=(function(){
+  const v=bacaJSON(KUNCI_SUDUT,[]);
+  return Array.isArray(v)?v.filter(x=>x&&typeof x.id==='string'&&typeof x.nama==='string'
+    &&Array.isArray(x.p)&&Array.isArray(x.t)&&x.p.length===3&&x.t.length===3
+    &&[...x.p,...x.t].every(Number.isFinite)):[];
+})();
+let tur=Object.assign({lama:10,acak:true,variasi:true,mati:[]},bacaJSON(KUNCI_TUR,{}));
+if(!Array.isArray(tur.mati))tur.mati=[];
+if(![6,10,15,25].includes(+tur.lama))tur.lama=10;
+let turTerakhir=null,turGerak={putar:.022,dorong:0};
+const TUR_BAWAAN=[
+  ['overview','Seluruh kantor'],['robot-a','Robot · dari dekat'],['desk','Trading desk'],
+  ['interior','Dalam ruangan'],['meeting','Ruang rapat'],['robot-b','Robot · sisi lain'],
+  ['top','Tampak atas'],['market','Market wall'],['expansion','Kantor tambahan'],['stairs','Kantor bertangga'],
+];
+/* Aturan letak yang sama dengan lampu (areaLampu): x <= -12 lantai atas,
+   z >= 10 perluasan. */
+function diAreaTersembunyi(x,z,sembunyi){return (x<=-12&&sembunyi.has('atas'))||(z>=10&&sembunyi.has('perluasan'));}
+function turTersembunyi(k,sembunyi){
+  if(k==='expansion')return sembunyi.has('perluasan');
+  if(k==='stairs')return sembunyi.has('atas');
+  if(k.startsWith('k:')){const x=sudutKustom.find(s=>'k:'+s.id===k);return !x||diAreaTersembunyi(x.t[0],x.t[2],sembunyi);}
+  return false;
+}
+function daftarTur(){
+  const sembunyi=areaSembunyi();
+  return [...TUR_BAWAAN.map(b=>b[0]),...sudutKustom.map(x=>'k:'+x.id)]
+    .filter(k=>!tur.mati.includes(k)&&!turTersembunyi(k,sembunyi));
+}
+function bidikanRobot(sisi){
+  const sembunyi=areaSembunyi();
+  const calon=npcs.filter(n=>n.group&&!diAreaTersembunyi(n.group.position.x,n.group.position.z,sembunyi));
+  const n=tur.variasi&&calon.length?calon[Math.floor(Math.random()*calon.length)]:npcs[state.selected];
+  const target=n.group.position.clone().add(V(0,1.15,0));
+  let off=V(sisi>0?2.2:-2.1,1.25,3.2);
+  if(tur.variasi){
+    off=V(0,0,3.1+Math.random()*1.6).applyAxisAngle(V(0,1,0),(Math.random()*2-1)*1.3);
+    off.y=.7+Math.random()*1.1;
+  }
+  return {position:target.clone().add(off.applyAxisAngle(V(0,1,0),n.heading)),target,label:n.profile?.name||'Robot'};
+}
+function bidikanTur(k){
+  if(k==='robot-a')return bidikanRobot(1);
+  if(k==='robot-b')return bidikanRobot(-1);
+  if(k.startsWith('k:')){const x=sudutKustom.find(s=>'k:'+s.id===k);return {position:V(...x.p),target:V(...x.t),label:x.nama};}
+  return presets[k]();
+}
+function simpanSudut(){
+  const isian=$('#sudut-nama');
+  const nama=((isian&&isian.value)||'').trim().slice(0,40)||('Sudut saya '+(sudutKustom.length+1));
+  const r=v=>Math.round(v*1000)/1000;
+  sudutKustom.push({id:Date.now().toString(36),nama,p:camera.position.toArray().map(r),t:controls.target.toArray().map(r)});
+  tulisJSON(KUNCI_SUDUT,sudutKustom);
+  if(isian)isian.value='';
+  gambarSudut();toast('Sudut "'+nama+'" tersimpan dan ikut auto tour.');
+}
+function pakaiSudut(id){
+  const x=sudutKustom.find(s=>s.id===id);if(!x)return;
+  setMode('orbit',false);moveCamera(V(...x.p),V(...x.t),1.8);
+  $$('[data-view]').forEach(b=>b.classList.remove('active'));
+  $$('[data-sudut]').forEach(b=>b.classList.toggle('active',b.dataset.sudut===id));
+  $('#camera-name').textContent=x.nama;
+}
+function hapusSudut(id){
+  sudutKustom=sudutKustom.filter(x=>x.id!==id);tur.mati=tur.mati.filter(k=>k!=='k:'+id);
+  tulisJSON(KUNCI_SUDUT,sudutKustom);tulisJSON(KUNCI_TUR,tur);gambarSudut();
+}
+/* Dibangun dengan textContent, bukan innerHTML: nama sudut diketik
+   bebas oleh pemiliknya. */
+function gambarSudut(){
+  const kotak=$('#sudut-daftar');
+  if(kotak){
+    kotak.replaceChildren();
+    if(!sudutKustom.length){
+      const p=document.createElement('p');p.className='sudut-kosong';
+      p.textContent='Belum ada. Atur kamera di mode Bebas, lalu simpan di bawah.';kotak.appendChild(p);
+    }
+    for(const x of sudutKustom){
+      const baris=document.createElement('div');baris.className='sudut-baris';
+      const b=document.createElement('button');b.className='view-button sudut-item';b.dataset.sudut=x.id;b.title='Pindah ke '+x.nama;
+      const sp=document.createElement('span');sp.textContent=x.nama;b.appendChild(sp);
+      const h=document.createElement('button');h.className='sudut-hapus';h.dataset.sudutHapus=x.id;
+      h.title='Hapus sudut ini';h.setAttribute('aria-label','Hapus '+x.nama);h.textContent='×';
+      baris.append(b,h);kotak.appendChild(baris);
+    }
+  }
+  const tk=$('#tur-daftar');
+  if(tk){
+    tk.replaceChildren();
+    for(const [k,label] of [...TUR_BAWAAN,...sudutKustom.map(x=>['k:'+x.id,x.nama])]){
+      const l=document.createElement('label');l.className='toggle-row';
+      const sp=document.createElement('span');sp.textContent=label;
+      const cb=document.createElement('input');cb.type='checkbox';cb.dataset.tur=k;cb.checked=!tur.mati.includes(k);
+      l.append(sp,cb);tk.appendChild(l);
+    }
+  }
+}
+function wireSudut(){
+  gambarSudut();
+  $('#sudut-simpan')?.addEventListener('click',simpanSudut);
+  $('#sudut-nama')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();simpanSudut();}});
+  $('#sudut-daftar')?.addEventListener('click',e=>{
+    const h=e.target.closest('[data-sudut-hapus]');
+    if(h){
+      /* Dua langkah: satu klik meleset tidak boleh membuang sudut yang
+         dibingkai dengan susah payah. */
+      if(h.dataset.yakin!=='1'){
+        h.dataset.yakin='1';h.textContent='Hapus?';h.classList.add('yakin');
+        setTimeout(()=>{if(h.isConnected){h.dataset.yakin='';h.textContent='×';h.classList.remove('yakin');}},3000);
+        return;
+      }
+      hapusSudut(h.dataset.sudutHapus);return;
+    }
+    const b=e.target.closest('[data-sudut]');if(b)pakaiSudut(b.dataset.sudut);
+  });
+  $('#tur-daftar')?.addEventListener('change',e=>{
+    const cb=e.target.closest('[data-tur]');if(!cb)return;
+    tur.mati=cb.checked?tur.mati.filter(k=>k!==cb.dataset.tur):[...new Set([...tur.mati,cb.dataset.tur])];
+    tulisJSON(KUNCI_TUR,tur);
+  });
+  const lama=$('#tur-lama');
+  if(lama){lama.value=String(tur.lama);lama.addEventListener('change',()=>{tur.lama=+lama.value||10;tulisJSON(KUNCI_TUR,tur);});}
+  const acak=$('#tur-acak');
+  if(acak){acak.checked=tur.acak;acak.addEventListener('change',()=>{tur.acak=acak.checked;tulisJSON(KUNCI_TUR,tur);});}
+  const vr=$('#tur-variasi');
+  if(vr){vr.checked=tur.variasi;vr.addEventListener('change',()=>{tur.variasi=vr.checked;tulisJSON(KUNCI_TUR,tur);});}
+}
+
 function tandaiLagu(){
   document.querySelectorAll('[data-lagu]').forEach(b=>{
     b.classList.toggle('active',+b.dataset.lagu===laguPilihan);});
+}
+/* Satu pintu untuk menutup panggung — dipakai tombol "Tutup panggung" dan
+   oleh lagu yang habis. Dua jalan yang masing-masing menulis langkahnya
+   sendiri cepat atau lambat berselisih satu langkah.
+
+   Yang ditutup OTOMATIS mengembalikan kamera ke Auto tour kalau tadinya
+   di sana: siaran yang ditinggal jalan tidak boleh berhenti menatap
+   panggung kosong. Yang ditutup tangan dibiarkan — orangnya sedang
+   memegang kamera. */
+function tutupPanggung(pesan,otomatis=false){
+  if(!joget.aktif)return;
+  joget.selesai(npcs,stations);performanceAudio.stopVoice();beatCamera.clear(camera);
+  $('#camera-name').textContent='Orbit bebas / 360°';
+  $('#joget-menu').hidden=true;$('#joget-btn').setAttribute('aria-expanded','false');
+  tandaiMenuJoget();
+  if(otomatis&&modeSebelumJoget==='cinema')setMode('cinema');
+  modeSebelumJoget=null;
+  if(pesan)toast(pesan);
 }
 function tandaiMenuJoget(){
   $$('[data-joget]').forEach(b=>{const i=+b.dataset.joget;
@@ -1177,9 +1372,23 @@ function tandaiMenuJoget(){
   $('#joget-btn').setAttribute('aria-pressed',String(joget.aktif));
   $('#dance-tempo-status').textContent=(joget.tempo<.6?'Slow motion':joget.tempo>1.3?'Cepat':'Normal')+' · '+joget.tempo.toFixed(2)+'×';
 }
-function setView(key){const p=presets[key]();setMode('orbit',false);moveCamera(p.position,p.target,1.8);$$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===key));$('#camera-name').textContent=p.label;}
-function nextTour(){tourIndex=(tourIndex+1)%8;tourTimer=0;let p;if(tourIndex===1||tourIndex===4){const n=npcs[state.selected],target=n.group.position.clone().add(V(0,1.15,0));p={position:target.clone().add(V(tourIndex===1?2.2:-2.1,1.25,3.2).applyAxisAngle(V(0,1,0),n.heading)),target};}else p=presets[['overview','desk','interior','meeting','top','market','expansion','stairs'][tourIndex]]();moveCamera(p.position,p.target,3.5);$('#camera-name').textContent='Auto tour · '+(tourIndex+1)+' / 8';}
-function updateCamera(dt){beatCamera.clear(camera);if(tween){const t=tween;t.elapsed+=dt;const k=smooth(clamp(t.elapsed/t.duration,0,1));camera.position.lerpVectors(t.from,t.to,k);controls.target.lerpVectors(t.targetFrom,t.targetTo,k);if(k>=1){tween=null;followPrevious=controls.target.clone();}}else if(state.mode==='follow'&&!interacting){const n=npcs[state.selected];const target=n.group.position.clone().add(V(0,1.1,0));const delta=target.clone().sub(controls.target).multiplyScalar(Math.min(1,dt*6));camera.position.add(delta);controls.target.add(delta);}else if(state.mode==='cinema'&&!interacting){const offset=camera.position.clone().sub(controls.target);offset.applyAxisAngle(V(0,1,0),dt*.022);camera.position.copy(controls.target).add(offset);}if(state.mode==='cinema'){tourTimer+=dt;if(tourTimer>10)nextTour();}controls.update();camera.position.y=Math.max(.18,camera.position.y);}
+function setView(key){const p=presets[key]();setMode('orbit',false);moveCamera(p.position,p.target,1.8);$$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===key));$$('[data-sudut]').forEach(b=>b.classList.remove('active'));$('#camera-name').textContent=p.label;}
+function nextTour(){
+  tourTimer=0;
+  const d=daftarTur();
+  if(!d.length){const p=presets.overview();moveCamera(p.position,p.target,3.5);$('#camera-name').textContent='Auto tour · tidak ada sudut yang dicentang';return;}
+  let i;
+  if(tur.acak&&d.length>1){do{i=Math.floor(Math.random()*d.length);}while(d[i]===turTerakhir);}
+  else i=(tourIndex+1)%d.length;
+  tourIndex=i;turTerakhir=d[i];
+  const p=bidikanTur(d[i]);
+  turGerak=tur.variasi
+    ?{putar:(Math.random()<.5?-1:1)*(.012+Math.random()*.03),dorong:[0,.014,-.012][Math.floor(Math.random()*3)],L0:null}
+    :{putar:.022,dorong:0,L0:null};
+  moveCamera(p.position,p.target,3.5);
+  $('#camera-name').textContent='Auto tour · '+(i+1)+' / '+d.length+(p.label?' · '+String(p.label).split(' · ')[0]:'');
+}
+function updateCamera(dt){beatCamera.clear(camera);if(tween){const t=tween;t.elapsed+=dt;const k=smooth(clamp(t.elapsed/t.duration,0,1));camera.position.lerpVectors(t.from,t.to,k);controls.target.lerpVectors(t.targetFrom,t.targetTo,k);if(k>=1){tween=null;followPrevious=controls.target.clone();}}else if(state.mode==='follow'&&!interacting){const n=npcs[state.selected];const target=n.group.position.clone().add(V(0,1.1,0));const delta=target.clone().sub(controls.target).multiplyScalar(Math.min(1,dt*6));camera.position.add(delta);controls.target.add(delta);}else if(state.mode==='cinema'&&!interacting){const offset=camera.position.clone().sub(controls.target);offset.applyAxisAngle(V(0,1,0),dt*turGerak.putar);if(turGerak.dorong){turGerak.L0??=offset.length();offset.setLength(Math.min(turGerak.L0*1.2,Math.max(turGerak.L0*.8,offset.length()*(1-dt*turGerak.dorong))));}camera.position.copy(controls.target).add(offset);}if(state.mode==='cinema'){tourTimer+=dt;if(tourTimer>tur.lama)nextTour();}controls.update();camera.position.y=Math.max(.18,camera.position.y);}
 function pick(e){pointer.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);raycaster.setFromCamera(pointer,camera);const hit=raycaster.intersectObjects(pickTargets,true).find(h=>objekTerlihat(h.object));if(!hit)return;let o=hit.object;while(o){if(o.userData.npc){selectNPC(o.userData.npc.index);return;}if(o.userData.focus){const f=o.userData.focus;setMode('orbit',false);const dir=camera.position.clone().sub(controls.target).normalize();moveCamera(f.point.clone().addScaledVector(dir,f.distance),f.point,1.3);toast(f.label);return;}o=o.parent;}}
 
 function updateUI(){updateDataStatus();const n=npcs[state.selected];if(!n)return;updatePaintControls(n);pasangDompet(n);$('#npc-name').textContent=n.profile.name;$('#npc-role').textContent=n.profile.role+' · '+n.colorName;$('#activity').textContent=n.joget?(n.jogetSampai?'Joget · '+joget.namaGerakan:'Menuju panggung'):n.wave>0?'Menyapa kamu':n.moving?'Menuju '+n.station.label.toLowerCase():n.station.activity;$('#npc-area').textContent=n.station.label;$('#npc-emotion').textContent=EMOTIONS[n.performance?.mood]||'Fokus';if($('#emotion-select')&&document.activeElement!==$('#emotion-select'))$('#emotion-select').value=n.performance?.manual||'auto';$('#task-progress').style.width=(n.wave>0?100*(1-n.wave/3):n.moving?100*n.pathIndex/Math.max(1,n.path.length):100*clamp(n.dwell/n.station.duration,0,1))+'%';$('#clock').textContent='JADITRADER · '+new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'})+' WIB';}
@@ -1237,6 +1446,8 @@ function loop(now){requestAnimationFrame(loop);detakFps(now);if(now-lastDraw<100
     }else{jamPose+=dt*joget.tempo;jamLaguSebelum=null;}
   }else if(musikIndeks!==-1&&joget.fase==='mati'){musikIndeks=-1;musik.matikan();jamLaguSebelum=null;}
   joget.perbarui(dt,npcs,joget.fase==='joget'?jamPose:null);
+  if(jogetBerhentiHabis&&joget.fase==='joget'&&laguPilihan<0&&joget.kunci===null&&joget.putaranPenuh)
+    tutupPanggung('Sepuluh gerakan selesai — robot kembali ke meja.',true);
   for(const st of Object.values(stations)){
     if(!st.kursi)continue;
     st.tarik=clamp((st.tarik||0)+(st.tarikMau?dt*2.6:-dt*2),0,1);
@@ -1403,7 +1614,7 @@ function wirePanelMutu(){
 }
 
 function wireUI(){
-  wirePanelMutu();
+  wirePanelMutu();wireSudut();
   $('#quality-select').value=mutu;$('#quality-select').disabled=false;$('#quality-select').onchange=e=>setQuality(e.target.value);
   $$('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));$$('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));$$('[data-npc]').forEach(b=>b.onclick=()=>selectNPC(+b.dataset.npc));$('#next-npc').onclick=()=>selectNPC(state.selected+1);$('#focus-btn').onclick=()=>focusNPC();$('#wave-btn').onclick=()=>{performanceAudio.unlock();npcs[state.selected].greet();performanceAudio.say('greeting',npcs[state.selected],true);focusNPC();toast(npcs[state.selected].profile.name+' menyapamu.');};$('#joget-btn').onclick=()=>{
 
@@ -1463,11 +1674,19 @@ function wireUI(){
       try{localStorage.setItem('jt.trabar.musikVol',g.value);}catch(e){}
     });
   })();
+  (function(){
+    const k=$('#joget-habis');if(!k)return;
+    k.checked=jogetBerhentiHabis;
+    k.addEventListener('change',()=>{
+      jogetBerhentiHabis=k.checked;musik.setUlang(!k.checked);
+      try{localStorage.setItem('jt.trabar.jogetHabis',k.checked?'1':'0');}catch(e){}
+    });
+  })();
   $$('[data-joget]').forEach(b=>b.onclick=()=>{
     performanceAudio.unlock();const i=+b.dataset.joget;
     if(joget.aktif){joget.pilihGerakan(i);}
     else{
-      joget.mulai(npcs,nav,i);beatCamera.shot=-1;beatCamera.lastView=null;
+      modeSebelumJoget=state.mode;joget.mulai(npcs,nav,i);beatCamera.shot=-1;beatCamera.lastView=null;
 
       setMode('orbit',false);
       moveCamera(V(PANGGUNG.x+4.68,2.35,PANGGUNG.z+4.51),V(PANGGUNG.x,.95,PANGGUNG.z),2.2);
@@ -1475,14 +1694,9 @@ function wireUI(){
     }
     tandaiMenuJoget();
   });
-  $('#joget-tutup').onclick=()=>{
-    joget.selesai(npcs,stations);performanceAudio.stopVoice();beatCamera.clear(camera);
-    $('#camera-name').textContent='Orbit bebas / 360°';
-    $('#joget-menu').hidden=true;$('#joget-btn').setAttribute('aria-expanded','false');
-    tandaiMenuJoget();
-  };
+  $('#joget-tutup').onclick=()=>tutupPanggung();
 
-  setInterval(()=>{if(!$('#joget-menu').hidden)tandaiMenuJoget();},700);$('#pause-btn').onclick=togglePause;$('#speed-btn').onclick=()=>{state.speed=state.speed===1?2:state.speed===2?.5:1;$('#speed-btn').textContent=state.speed+'×';};$('#cutaway-toggle').onchange=e=>state.cutaway=e.target.checked;$('#labels-toggle').onchange=e=>state.labels=e.target.checked;$('#fullscreen-btn').onclick=fullscreen;$('#ui-btn').onclick=toggleUI;$('#restore-ui').onclick=toggleUI;$('#help-btn').onclick=()=>$('#help').showModal();$('#close-help').onclick=()=>$('#help').close();$('#help').onclick=e=>{if(e.target===$('#help')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}};
+  setInterval(tandaiMenuJoget,700);$('#pause-btn').onclick=togglePause;$('#speed-btn').onclick=()=>{state.speed=state.speed===1?2:state.speed===2?.5:1;$('#speed-btn').textContent=state.speed+'×';};$('#cutaway-toggle').onchange=e=>state.cutaway=e.target.checked;$('#labels-toggle').onchange=e=>state.labels=e.target.checked;$('#fullscreen-btn').onclick=fullscreen;$('#ui-btn').onclick=toggleUI;$('#restore-ui').onclick=toggleUI;$('#help-btn').onclick=()=>$('#help').showModal();$('#close-help').onclick=()=>$('#help').close();$('#help').onclick=e=>{if(e.target===$('#help')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}};
   addEventListener('keydown',e=>{if(!state.loaded||$('#help').open||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const key=e.key.toLowerCase();if(key===' '){e.preventDefault();togglePause();}if((e.ctrlKey||e.metaKey)&&key==='z'){e.preventDefault();urungLangkah();return;}if(e.key==='Escape'){tutupPopup();aturLepas();}
     if(atur.objek&&allowLayoutEdit()){
       if(key==='delete'||key==='backspace'){e.preventDefault();toggleObjectDeleted(atur.objek);return;}

@@ -1,0 +1,97 @@
+/* ════════════════════════════════════════════════════════════════════
+   GAYA PANEL — dipakai BERSAMA oleh ruangan (index.html) dan halaman
+   kontrol (kontrol.html)
+   ════════════════════════════════════════════════════════════════════
+   Dua blok pertama di bawah dulu tertanam sebagai <style> di dalam
+   index.html. Dipindah ke sini 27 Sep 2026 karena halaman kontrol
+   menampilkan panel yang sama — dan gaya yang tinggal di satu halaman
+   saja berarti panel setelan kualitas dan daftar lagu tampil telanjang
+   di halaman yang lain. */
+
+/* ── DAFTAR LAGU DI MENU JOGET ──────────────────────────────────────────
+   26 baris tidak muat di menu yang tingginya sudah dipakai sepuluh
+   gerakan, jadi daftarnya bergulir sendiri di dalam kotaknya. Batangnya
+   dibiarkan TERLIHAT di sini — beda dengan panel sentimen di aplikasi:
+   di sana ruangnya diperebutkan, di sini batang gulir adalah satu-satunya
+   petunjuk bahwa masih ada lagu di bawah. */
+.lagu-judul{margin-top:10px}
+.lagu-daftar{max-height:184px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;
+  padding-right:2px;margin-bottom:8px}
+.lagu-item{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.lagu-ket{font-size:10.5px;opacity:.55;white-space:nowrap}
+
+/* Digeser ke KIRI panel robot, tidak menimpanya. Keduanya semula duduk di right:28px top:108px yang sama persis, dan panel setelan yang menutupi panel robot terbaca seperti panel robotnya hilang. Di layar sempit ia kembali menumpuk — di sana memang tidak ada ruang untuk dua. */.mutu-panel{top:108px;right:300px;width:252px;padding:16px 14px;display:grid;gap:7px;max-height:calc(100dvh - 190px);overflow-y:auto;z-index:3}.mutu-kepala{display:flex;align-items:center;justify-content:space-between;gap:8px}.mutu-tutup{color:var(--muted);font-size:12px;padding:0}.mutu-tutup:hover{color:#fff}.mutu-fps{font:15px ui-monospace,monospace;color:#ffc27c;background:#f18a1912;border:1px solid #f18a1935;border-radius:8px;padding:7px 10px;text-align:center;letter-spacing:.04em}.mutu-baris{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:#c9c7ba;padding:2px 0}.mutu-baris select{background:#20231f;color:#e5e1d6;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:12px;max-width:112px}.mutu-geser{display:grid;gap:5px}.mutu-geser output{font:11px ui-monospace,monospace;color:var(--muted);justify-self:end}.mutu-geser input[type=range]{width:100%;accent-color:#e5a15a}.mutu-ket{font-size:11px;color:#8c9088;line-height:1.5;margin:2px 0 0}@media(max-width:1100px){.mutu-panel{right:28px}}@media(max-width:760px){.mutu-panel{right:13px;top:83px;width:214px;padding:12px 11px}}
+
+
+/* ── LAYAR BERSIH ─────────────────────────────────────────────────────
+   Diminta pemilik 27 Sep 2026: layar Trading Floor bersih dari panel;
+   semua kendali pindah ke halaman kontrol (kendali.js, kontrol.html).
+
+   Yang TETAP tampil di layar bersih:
+     judul ruangan    identitas siaran
+     status pasar     "PASAR LIVE" — keterangan, bukan kendali
+     ikon gerigi      satu-satunya jalan ke halaman kontrol — membuka
+                      jendela terpisah, cara yang sama dengan tombol
+                      lepas panel di multi chart halaman Chart & Entry
+     layar penuh      wajib di sini: permintaan layar penuh cuma sah
+                      dari sentuhan di jendela ini sendiri
+     jam & kredit     kreditnya WAJIB terlihat — model robotnya berlisensi
+                      CC BY 4.0, dan atribusi adalah syarat lisensinya
+
+   Toast ikut disembunyikan: seluruhnya umpan balik tombol ("Sudut
+   tersimpan", "Satu langkah diurungkan"), dan halaman kontrol
+   menampilkannya di tempat orangnya sedang menekan.
+
+   Tombol P mengembalikan semua panel ke layar ini, untuk layar tunggal
+   yang tidak bisa membuka dua jendela berdampingan. */
+html.bersih .view-panel,html.bersih .npc-panel,html.bersih .mutu-panel,html.bersih .director,
+html.bersih .hint,html.bersih .camera-info,html.bersih .toast,
+html.bersih .top-actions>:not(#kontrol-btn):not(#fullscreen-btn):not(.sim-label){display:none!important}
+/* Gerigi yang sama dengan tombol panel kualitas, tapi ia sebuah <a>:
+   kalau popup ditolak peramban, tautannya tetap membuka halaman kontrol
+   sebagai tab. Aturan ikon style.css ditulis untuk `button svg`, jadi
+   diulang untuk <a>. */
+.kontrol-buka{text-decoration:none;color:inherit}
+.kontrol-buka svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
+/* Satu gerigi di satu waktu. Layar bersih: gerigi membuka jendela kontrol.
+   Panel tampil di layar ini (tombol P): gerigi kembali ke fungsi lamanya,
+   membuka panel kualitas di tempat. */
+html:not(.bersih) #kontrol-btn{display:none}
+
+/* ── [hidden] WAJIB DISEBUT ULANG UNTUK PANEL KUALITAS ────────────────
+   `.mutu-panel{display:grid}` di atas mengalahkan `[hidden]{display:none}`
+   milik style.css — bobotnya sama, dan yang belakangan menang. Akibatnya
+   panel kualitas tampil terus walau tombol gerigi sudah menutupnya.
+   Ketahuan 27 Sep 2026 di ruangan tiruan: panelnya muncul tanpa pernah
+   dibuka. Jebakan yang sama sudah dicatat untuk menu joget di style.css. */
+.mutu-panel[hidden]{display:none}
+
+/* ── SUDUT SAYA & PENGATURAN AUTO TOUR ────────────────────────────────
+   Panel sudut pandang kini memuat daftar sudut sendiri dan pengaturan
+   tour, jadi ia boleh lebih tinggi dari layar — bergulir, bukan
+   menabrak bilah kamera di bawahnya. */
+.view-panel{max-height:calc(100dvh - 200px);overflow-y:auto}
+.sudut-judul,.tur-judul{padding:0 10px;margin:4px 0 6px;font-size:11px}
+.sudut-daftar{display:grid;gap:2px}
+.sudut-baris{display:flex;align-items:center;gap:2px}
+.sudut-baris .sudut-item{flex:1;min-width:0}
+.sudut-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sudut-hapus{flex:none;min-width:30px;height:32px;border-radius:7px;color:var(--muted);font-size:16px;padding:0 6px}
+.sudut-hapus:hover{background:#ffffff0c;color:#fff}
+.sudut-hapus.yakin{color:#ffb4a0;background:#e5484d1f;font-size:11px}
+.sudut-kosong{font-size:11.5px;color:#8c9088;line-height:1.5;margin:2px 10px 6px}
+.sudut-simpan{display:grid;gap:6px;padding:6px 8px 2px}
+.sudut-simpan input{width:100%;background:#20231f;color:#e5e1d6;border:1px solid var(--line);border-radius:7px;padding:8px 9px;font-size:12.5px}
+.sudut-simpan input::placeholder{color:#8c9088}
+.sudut-simpan .soft-button{font-size:12px;padding:9px 8px}
+.tur-atur{margin:8px 4px 2px;padding:0 4px}
+.tur-atur>summary{cursor:pointer;font-size:12.5px;color:#c9c7ba;padding:8px 6px}
+.tur-atur[open]>summary{color:#ffc27c}
+.tur-atur .mutu-baris{padding:4px 6px}
+.tur-daftar{display:grid;max-height:240px;overflow-y:auto}
+.tur-daftar .toggle-row{padding:6px}
+.tur-daftar .toggle-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Di ponsel panel ini berupa kolom ikon selebar 45 px (style.css). Isian
+   teks dan daftar tidak punya tempat di sana — dan di ponsel kendalinya
+   memang lewat halaman kontrol. */
+@media(max-width:760px){.sudut-judul,.sudut-daftar,.sudut-simpan,.tur-atur{display:none}}

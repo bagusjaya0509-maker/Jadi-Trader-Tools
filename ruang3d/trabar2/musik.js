@@ -56,12 +56,27 @@ export class Musik {
     this.el = null; this.nyala = false; this.kini = null;
     this.ada = new Map(); this.volume = 0.48; this.rate = 1;
     this.paused = false; this.request = 0;
+    /* ── BERHENTI SAAT LAGU HABIS ────────────────────────────────────
+       Diminta pemilik 27 Sep 2026: "kalau musiknya habis maka robotnya
+       bisa auto berhenti joget." Sebelumnya mustahil — pemutarnya dibuat
+       dengan `loop = true`, jadi lagunya memang tidak pernah habis.
+
+       `ulang` sekarang bisa dimatikan, dan `onHabis` mengabari pemanggil.
+       Apa yang terjadi SESUDAH lagu habis (bubarkan panggung, atau ulangi
+       karena penarinya belum sampai) sengaja tidak diputuskan di sini:
+       kelas ini tidak tahu apa-apa soal panggung. */
+    this.ulang = true; this.onHabis = null;
   }
 
   _pemutar() {
     if (!this.el) {
-      this.el = new Audio(); this.el.loop = true;
+      this.el = new Audio(); this.el.loop = this.ulang;
       this.el.preload = 'auto'; this.el.volume = this.volume;
+      /* `ended` tidak pernah menyala selama `loop` hidup — jadi mode lama
+         (lagu diulang terus) tetap persis seperti sebelumnya. */
+      this.el.addEventListener('ended', () => {
+        if (this.nyala && this.kini) this.onHabis?.(this.kini);
+      });
     }
     return this.el;
   }
@@ -94,6 +109,15 @@ export class Musik {
   matikan() { this.request++; this.nyala = false; this.kini = null; this.el?.pause(); }
   hilang(nama) { return this.ada.get(nama) === false; }
   setVolume(v) { this.volume = Math.max(0, Math.min(1, v)); if (this.el) this.el.volume = this.volume; }
+  setUlang(v) { this.ulang = !!v; if (this.el) this.el.loop = this.ulang; }
+
+  /** Putar lagi dari detik nol — untuk lagu yang habis sebelum penarinya
+   *  sampai di panggung. */
+  dariAwal() {
+    if (!this.el || !this.kini) return;
+    this.el.currentTime = 0;
+    if (!this.paused) this.el.play().catch(() => { this.nyala = false; });
+  }
 
   transport(paused, rate = 1) {
     this.rate = rate;

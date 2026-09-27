@@ -91,10 +91,17 @@ terbukti) dan `/tmp/main.bak4` … `/tmp/main.bak10`. `/tmp` hilang saat reboot
 
 ## 4. Memulihkan dari nol
 
-Kode dari repo ini; aset dari `Kantor 3D/` pada vault pemilik dan dari
-`Template V3/public/3d/trading-floor-v2/` (leluhur 16 Sep — GLB dan MP3-nya
-sama, kodenya jauh lebih tua). Cocokkan dengan `sidik-aset.txt` sebelum
-percaya. `vendor/` ambil three.js r180.
+Kode dari repo ini. **Satu-satunya salinan aset yang lengkap ada di VPS.**
+
+Versi pertama catatan ini (27 Sep 2026, pagi) menulis bahwa
+`Template V3/public/3d/trading-floor-v2/` punya GLB dan MP3 yang sama. Itu
+SALAH — ditulis tanpa diukur. Diukur beberapa jam kemudian dengan
+`sidik-aset.txt`: cuma **24 dari 62** berkas yang sama (vendor/, panorama,
+satu JSON). Kelima GLB dan 33 MP3 berbeda atau tidak ada di sana, 103,8 MB.
+
+Jadi sebelum VPS dibuang atau dipindah, tarik dulu `assets/`, `musik/`, dan
+`vendor/` dari `/root/ruang3d/trabar2/`, lalu cocokkan dengan
+`sidik-aset.txt`. `vendor/` = three.js r180.
 
 ---
 
@@ -113,10 +120,25 @@ percaya. `vendor/` ambil three.js r180.
 | `warm-look.js`, `window-illusion.js`, `room-refinements.js`, `document-materials.js` | Sentuhan tampilan |
 | `musik.js` | Pemutar 25 lagu |
 | `index.html`, `style.css`, `tokens.css` | Kerangka & panel |
+| `panel.css` | Gaya panel yang dipakai BERSAMA ruangan dan halaman kontrol, plus aturan layar bersih |
+| `kendali.js` | Sisi ruangan dari halaman kontrol: layar bersih, cermin panel, menjalankan aksi |
+| `kontrol.html`, `kontrol.js`, `kontrol.css` | Halaman kontrol terpisah — dibuka ikon gerigi, jendela sendiri |
 
 ---
 
-## 6. Dua hal yang masih terbuka (27 Sep 2026)
+## 6. Halaman kontrol terpisah (27 Sep 2026)
+
+Layar ruangan bersih dari panel; semua kendali ada di `kontrol.html`,
+dibuka ikon gerigi di pojok kanan atas sebagai jendela sendiri — cara yang
+sama dengan tombol lepas panel di multi chart. Panelnya TIDAK dipindah:
+tetap di `index.html`, disembunyikan, dan halaman kontrol menampilkan
+salinannya lewat BroadcastChannel. Klik di sana dijalankan pada elemen
+asli di sini. Alasan lengkap di kepala `kendali.js`.
+
+Tombol di ruangan: **K** buka kontrol, **P** panel kembali tampil di layar
+ruangan (untuk layar tunggal).
+
+## 7. Dua hal yang masih terbuka (27 Sep 2026)
 
 1. **Tembok melengkung.** Saat batas area kantor diperbaiki, muncul tembok
    besar melengkung yang seharusnya tidak ada. Sudah terbukti berasal dari

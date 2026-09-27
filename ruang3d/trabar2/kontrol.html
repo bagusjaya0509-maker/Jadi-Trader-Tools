@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="id" class="kd">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>Kontrol · Trading Floor</title>
+ <meta name="theme-color" content="#1b1d1a">
+ <!-- Gaya panel ruangan (style.css + panel.css) disisipkan kontrol.js
+      TEPAT sebelum baris ini, tanpa blok layar-sempitnya. Lihat
+      muatGaya() di sana untuk alasannya. -->
+ <link rel="stylesheet" href="./kontrol.css" id="kd-gaya">
+</head>
+<body>
+<header class="kd-kepala">
+ <div class="kd-merek">
+  <div class="kd-lambang" aria-hidden="true">T</div>
+  <div>
+   <h1>Kontrol Trading Floor</h1>
+   <p class="kd-status" id="kd-status" data-k="tunggu" role="status">Mencari ruangan…</p>
+  </div>
+ </div>
+ <div class="kd-aksi">
+  <div data-akar="status"></div>
+  <label class="kd-sakelar" title="Tombol P di layar ruangan melakukan hal yang sama">
+   <input type="checkbox" id="kd-panel-ruang"> Panel juga tampil di layar ruangan
+  </label>
+  <a class="kd-tombol" href="./" target="jt-trabar2-ruang">Buka ruangan ↗</a>
+ </div>
+</header>
+
+<main class="kd-isi">
+ <section class="kd-kosong" id="kd-kosong">
+  <h2>Belum tersambung ke ruangan</h2>
+  <p>Halaman ini mengendalikan Trading Floor yang sedang terbuka di peramban yang sama — di tab lain, jendela lain, atau di halaman Trading Floor aplikasi. Buka ruangannya, lalu tunggu sebentar: sambungannya terbentuk sendiri.</p>
+  <a class="kd-tombol kd-tombol-utama" href="./" target="jt-trabar2-ruang">Buka ruangan ↗</a>
+ </section>
+
+ <section class="kd-kartu kd-kamera" aria-label="Kamera dan panggung joget">
+  <div class="kd-kamera-kepala">
+   <span class="eyebrow">Kamera &amp; panggung</span>
+   <div data-akar="kameraInfo"></div>
+   <div data-akar="objek" title="Tata perabot — pilih bendanya langsung di layar ruangan"></div>
+  </div>
+  <div data-akar="kamera"></div>
+ </section>
+
+ <div class="kd-kolom">
+  <div data-akar="sudut"></div>
+  <div data-akar="joget" id="kd-joget"></div>
+  <div data-akar="robot"></div>
+  <div data-akar="mutu"></div>
+ </div>
+</main>
+
+<div data-akar="toast"></div>
+<script type="module" src="./kontrol.js"></script>
+</body>
+</html>

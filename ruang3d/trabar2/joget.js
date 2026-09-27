@@ -390,6 +390,12 @@ export class Joget {
     this.kunci = null;
     this.tPose = 0;          // jam FASE gerakan — ikut lagu kalau ada
     this.bobot = 0;          // 0..1, campuran pose tarian terhadap klip
+    /* Gerakan tempat satu putaran dimulai. Dalam mode bergantian dengan
+       lagu Otomatis, pengiringnya berganti tiap gerakan dan tidak pernah
+       sampai ujung — jadi "lagunya habis" diartikan sebagai seluruh
+       sepuluh gerakan sudah dibawakan sekali. Lihat `putaranPenuh`. */
+    this.putaranAwal = 0;
+    this.putaranPenuh = false;
   }
 
   get aktif() { return this.fase !== 'mati'; }
@@ -431,6 +437,7 @@ export class Joget {
        daripada urutan yang 'tidak mengulang'. Kalau satu gerakan DIKUNCI, ia
        yang jadi titik mulainya. */
     this.gerakan = this.kunci ?? 0;
+    this.putaranAwal = this.gerakan; this.putaranPenuh = false;
     this.tPose = 0;
     /* ── SLOT DIBAGI MENURUT JARAK, BUKAN NOMOR URUT ────────────────
        Dulu robot ke-i selalu dapat slot ke-i. Karena nomor urut tidak ada
@@ -522,6 +529,7 @@ export class Joget {
   pilihGerakan(i) {
     this.kunci = i < 0 ? null : i;
     if (Number.isInteger(i) && i >= 0 && i < GERAKAN.length) this.gerakan = i;
+    this.putaranAwal = this.gerakan; this.putaranPenuh = false;
     /* Bobot diturunkan supaya pergantiannya luruh lewat klip diam, bukan
        berpindah pose dalam satu bingkai. */
     this.bobot = 0.15;
@@ -592,6 +600,7 @@ export class Joget {
       if (this.kunci === null
           && Math.floor(this.t / DURASI_GERAKAN) !== Math.floor(sebelum / DURASI_GERAKAN)) {
         this.gerakan = (this.gerakan + 1) % GERAKAN.length;
+        if (this.gerakan === this.putaranAwal) this.putaranPenuh = true;
         /* Bobot diturunkan sebentar, bukan dipatahkan: selama 0,4 detik
            berikutnya pose lama luruh ke klip diam lalu naik lagi ke pose
            baru. Tanpa itu, seluruh badan berpindah pose dalam satu bingkai
