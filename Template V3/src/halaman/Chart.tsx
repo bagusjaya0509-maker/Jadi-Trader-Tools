@@ -3,9 +3,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
-  Layers, ChevronDown, ChevronUp, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
-  MoveRight,
-  FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
+  Layers, ChevronDown, ChevronUp, Settings2, Code2, X,
+  FlaskConical, Maximize2, Minimize2,
   Settings, RotateCcw, LayoutGrid, Link2, Briefcase, Trash2 } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
@@ -17,6 +16,7 @@ import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
 import { POLOS, UTAMA, ID_PANEL, TF_PANEL, kirimBus, dengarBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
+import { BilahGambar, useSetelanBilah } from '@/components/bilah-gambar';
 import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, tickSimbol, keTick, type MetodeTp } from '@/lib/order-nyata';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pine';
@@ -144,11 +144,6 @@ function Angka({ label, nilai, atur, langkah = 1, min = 0 }: {
  *  jadi simbol yang tidak ada, dan chart menjawab "belum ada data dari
  *  terminal MT5" — pesan yang menunjuk ke EA, padahal EA-nya baik-baik
  *  saja dan yang salah nama yang kita cari. */
-/* Berapa lama bilah alat gambar menganggur sebelum melipat sendiri.
-   Sengaja lebih panjang daripada panel order: memilih alat lalu berpikir
-   di mana menaruh garisnya memakan waktu, dan bilah yang lenyap di tengah
-   pertimbangan itu memaksa mulai dari awal. */
-const JEDA_LIPAT_ALAT_MS = 20_000;
 
 /* ── GAMBAR ALAT MILIK SIMBOL, BUKAN SIMBOL+TIMEFRAME ────────────────────
    Dulu kuncinya `jt.alat.<simbol>|<tf>`, jadi garis yang ditarik di Harian
@@ -984,6 +979,13 @@ export default function ChartBacktest() {
      SIMBOL+TF: kotak support BTC 1 jam tidak ada urusannya dengan ETH. */
   const [alat, setAlat] = useState<AlatPegang | null>(null);
   const [gambarAlat, setGambarAlat] = useState<GambarAlat[]>([]);
+  /* Setelan bilah gambar — kursor, magnet, tetap menggambar, kunci,
+     sembunyi, terbuka/terlipat — disimpan per perangkat di dalam hook-nya.
+     `tetapRef` karena `tambahGambar` di bawah dibungkus useCallback yang
+     sengaja cuma bergantung pada simbol. */
+  const bilah = useSetelanBilah();
+  const tetapRef = useRef(bilah.tetap);
+  tetapRef.current = bilah.tetap;
 
   /* ── URUNG (Ctrl+Z) ──────────────────────────────────────────────────
      Tumpukan potret `gambarAlat` SEBELUM tiap perubahan. Potret utuh, bukan
@@ -1085,7 +1087,9 @@ export default function ChartBacktest() {
     /* Satu tarikan, satu gambar — kembali ke kursor biasa. Menggambar lagi
        tinggal menekan alatnya lagi; alat yang menempel diam-diam membuat
        seretan chart berikutnya jadi kotak yang tidak diminta. */
-    setAlat(null);
+    /* Kecuali "tetap menggambar" dinyalakan di bilah — lalu alatnya tetap
+       dipegang untuk gambar berikutnya, seperti di TradingView. */
+    if (!tetapRef.current) setAlat(null);
   }, [simbol]);
   /* Menggeser gambar / menarik ujungnya. Disimpan ke kunci simbol yang SAMA
      dengan penambahan — gambar yang dipindah lalu kembali ke tempat lama
@@ -1114,6 +1118,30 @@ export default function ChartBacktest() {
      alat posisi menempel, memilih gambarnya, lalu melepaskan dirinya —
      dan pelepasan itu langsung mencabut pilihan yang baru saja dibuat. */
   useEffect(() => { if (alat) setGambarPilih(null); }, [alat]);
+  /* Gambar yang dikunci atau disembunyikan tidak boleh tetap terpilih:
+     pegangannya akan menjanjikan seretan yang tidak akan terjadi, dan
+     Delete akan menghapus sesuatu yang tidak terlihat. */
+  useEffect(() => { if (bilah.kunci || bilah.sembunyi) setGambarPilih(null); }, [bilah.kunci, bilah.sembunyi]);
+
+  /* Tombol hapus di bilah: yang terpilih dulu; kalau tidak ada yang
+     terpilih, semuanya — dengan konfirmasi, dan tetap bisa diurung. */
+  function hapusGambar() {
+    if (gambarPilih) {
+      catatRiwayat();
+      setGambarAlat((d) => {
+        const b = d.filter((g) => g.id !== gambarPilih);
+        simpanAlat(simbol, b);
+        return b;
+      });
+      setGambarPilih(null);
+      return;
+    }
+    if (!gambarAlat.length) return;
+    if (!confirm(`Hapus ${gambarAlat.length} gambar di ${simbol}? Berlaku di semua timeframe. Bisa diurungkan dengan Ctrl+Z.`)) return;
+    catatRiwayat();
+    setGambarAlat([]);
+    simpanAlat(simbol, []);
+  }
   useEffect(() => {
     const tekan = (e: KeyboardEvent) => {
       const t = document.activeElement?.tagName;
@@ -1153,60 +1181,10 @@ export default function ChartBacktest() {
     window.addEventListener('keydown', tekan);
     return () => window.removeEventListener('keydown', tekan);
   }, [gambarPilih, simbol, tf, catatRiwayat]);
-  /* BAWAANNYA TERLIPAT — alasan yang sama dengan panel order: di layar
-     ponsel bilah alat gambar memakan tepi chart sebelum ada satu pun
-     gambar yang ingin dibuat. Yang pernah membukanya sendiri tetap
-     menemukannya terbuka; cuma yang BELUM PERNAH memilih (null) yang
-     dilipat. */
-  const [alatTutup, setAlatTutup] = useState(() => {
-    try {
-      const v = localStorage.getItem('jt.alatTutup');
-      return v === null ? true : v === '1';
-    } catch { return true; }
-  });
-  /* ── Letak bilah alat: BISA DIPINDAH ────────────────────────────
-     Posisi tetap selalu salah untuk sebagian orang: panel order membuka
-     dari kiri atas, dock Pine dari kanan, dan tinggi chart bisa diseret.
-     Apa pun sudut yang dipilih, ada susunan yang membuatnya menghalangi.
-     Jadi tempatnya ditentukan pemakainya sendiri — diseret, lalu diingat
-     per perangkat.
-
-     Disimpan sebagai jarak dari kiri-atas area chart dalam piksel, bukan
-     persen: chart yang tingginya diseret akan menggeser bilah yang
-     posisinya berbasis persen, padahal orangnya tidak memindahkannya. */
-  /* null = belum pernah dipindah → pakai tempat bawaannya (pojok kiri
-     bawah, lewat kelas CSS). Menyimpan bawaan sebagai ANGKA piksel akan
-     mengunci letaknya ke satu ukuran layar: yang pas di 1280 px jatuh di
-     tengah chart pada layar 3440 px. Angka baru muncul setelah orangnya
-     benar-benar memindahkannya. */
-  const [letakAlat, setLetakAlat] = useState<{ x: number; y: number } | null>(() => {
-    try {
-      const d = JSON.parse(localStorage.getItem('jt.letakAlat') ?? 'null');
-      if (d && typeof d.x === 'number' && typeof d.y === 'number') return d;
-    } catch { /* privat */ }
-    return null;
-  });
-  /* ── TEPI KIRI CHART, BUKAN TEPI KIRI AREA ────────────────────────
-     `areaChart` memuat panel kiri (daftar dompet/konsensus/acuan jiplak)
-     DAN grafiknya. Semua hamparan dijangkarkan ke sana, jadi begitu panel
-     kirinya terbuka, `left: 8` berhenti berarti "di tepi lilin" dan mulai
-     berarti "di atas daftar" — bilah alat gambar duduk menimpa isi panel,
-     yang justru terlihat seperti bilahnya yang salah tempat.
-
-     Panelnya melaporkan berapa piksel yang ia makan; angka itu ditambahkan
-     ke letak bilahnya dan dikurangkan dari jepitan seretannya. Letak yang
-     TERSIMPAN tetap relatif terhadap chart, jadi menutup panel tidak
-     memindahkan bilah yang sudah ditaruh orangnya. */
-  const [sisaKiri, setSisaKiri] = useState(0);
-  /* DUA panel kiri, dua pelapor. `PanelBelah` berdiri di LUAR ChartLilin
-     (Screener, konsensus, wallet view); `panelKiri` berdiri di DALAM-nya
-     (acuan jiplak, chart banding, dan panel Dompet). Keduanya bisa terbuka
-     bersamaan, jadi yang dipakai menggeser bilah alat adalah JUMLAHNYA —
-     memakai salah satu saja membuat bilahnya tetap tertimpa persis pada
-     kombinasi yang paling sering dipakai. Panel Dompet tertimpa karena
-     sumber kedua ini dulu tidak ada sama sekali. */
+  /* Lebar panel kiri DI DALAM ChartLilin (acuan jiplak, chart banding,
+     panel Dompet). Dipakai tombol "tampilkan bilah gambar" yang terlipat,
+     supaya ia duduk di tepi kanvas, bukan di atas daftar panel itu. */
   const [sisaKiriDalam, setSisaKiriDalam] = useState(0);
-  const kiriTotal = sisaKiri + sisaKiriDalam;
   const areaChart = useRef<HTMLDivElement>(null);
   /** Kartu chart utuh — bilah kendali DAN grafiknya. Inilah yang dinaikkan
    *  ke layar penuh; `areaChart` tetap dipakai untuk mengukur lebar kanvas. */
@@ -1215,115 +1193,12 @@ export default function ChartBacktest() {
    *  supaya kanvasnya mengisi sisa jendela dengan tepat. */
   const bilahChart = useRef<HTMLDivElement>(null);
 
-  function mulaiSeretAlat(e: React.PointerEvent) {
-    /* Tombol alatnya sendiri tidak boleh ikut memicu seretan — kalau ikut,
-       memilih alat jadi mustahil tanpa menggeser bilahnya. */
-    if ((e.target as HTMLElement).closest('button')) return;
-    e.preventDefault();
-    const kotakBilah = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const b0 = areaChart.current?.getBoundingClientRect();
-    /* Kalau belum pernah dipindah, titik awalnya diambil dari LETAK
-       SEBENARNYA di layar — bukan dari angka bawaan yang tidak ada. */
-    const awal = {
-      x: e.clientX, y: e.clientY,
-      lx: letakAlat ? letakAlat.x : (b0 ? kotakBilah.left - b0.left - kiriTotal : 8),
-      ly: letakAlat ? letakAlat.y : (b0 ? kotakBilah.top - b0.top : 8),
-    };
-    const batas = () => areaChart.current?.getBoundingClientRect();
-    const hitung = (ev: PointerEvent) => {
-      const b = batas();
-      const x = awal.lx + (ev.clientX - awal.x);
-      const y = awal.ly + (ev.clientY - awal.y);
-      if (!b) return { x, y };
-      /* Dijepit di dalam area chart, disisakan 36 px supaya bilahnya
-         tidak bisa diseret keluar layar dan hilang selamanya. */
-      return {
-        x: Math.max(4, Math.min(b.width - kiriTotal - 36, x)),
-        y: Math.max(4, Math.min(b.height - 36, y)),
-      };
-    };
-    const gerak = (ev: PointerEvent) => setLetakAlat(hitung(ev));
-    const lepas = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', gerak);
-      window.removeEventListener('pointerup', lepas);
-      try { localStorage.setItem('jt.letakAlat', JSON.stringify(hitung(ev))); } catch { /* privat */ }
-    };
-    window.addEventListener('pointermove', gerak);
-    window.addEventListener('pointerup', lepas);
-  }
 
-  /* ── BILAH ALAT MENGHINDAR DARI TIKET ORDER ────────────────────────
-     Tiket order dijangkarkan di pojok kiri-ATAS chart dan tumbuh ke
-     bawah; bilah alat duduk di tepi kiri, di TENGAH. Di chart yang
-     pendek — HP, atau jendela yang tingginya dikecilkan — keduanya
-     bertemu, dan yang tertimbun bilah alatnya.
-
-     Digeser sementara lewat transform, BUKAN dengan mengubah `letakAlat`.
-     letakAlat adalah tempat yang dipilih orangnya sendiri dan disimpan;
-     menimpanya berarti posisi pilihannya hilang diam-diam, dan ia tidak
-     akan kembali saat tiketnya ditutup. */
-  const alatRef = useRef<HTMLElement | null>(null);
+  /* Pembungkus tiket order. Dulu diamati untuk menggeser palet alat
+     gambar yang mengambang supaya tidak tertimbun tiketnya; sejak bilah
+     gambar jadi kolom di luar kanvas (29 Sep 2026) keduanya tidak pernah
+     bertemu lagi. */
   const pojokRef = useRef<HTMLDivElement>(null);
-  const geserRef = useRef(0);
-  const [geserAlat, setGeserAlat] = useState(0);
-  useEffect(() => { geserRef.current = geserAlat; }, [geserAlat]);
-
-  useEffect(() => {
-    const hitung = () => {
-      const a = alatRef.current, p = pojokRef.current;
-      if (!a || !p) { setGeserAlat(0); return; }
-      const ra = a.getBoundingClientRect();
-      const rp = p.getBoundingClientRect();
-      if (!rp.width || !rp.height) { setGeserAlat(0); return; }
-      /* Kotak alat pada posisi ASLINYA: geseran yang sedang berlaku
-         dikurangkan dulu. Tanpa ini tiap pengukuran menumpuk di atas
-         pengukuran sebelumnya dan bilahnya merayap turun tanpa henti. */
-      const atas = ra.top - geserRef.current;
-      const bawah = ra.bottom - geserRef.current;
-      const tindih = rp.left < ra.right && rp.right > ra.left
-                  && rp.top < bawah && rp.bottom > atas;
-      setGeserAlat(tindih ? Math.round(rp.bottom + 8 - atas) : 0);
-    };
-    hitung();
-    /* ResizeObserver, bukan daftar state: tiket order melipat, membuka,
-       dan berganti bentuk dari dalam dirinya sendiri — halaman ini tidak
-       tahu kapan. Yang bisa diamati cuma akibatnya, yaitu ukurannya. */
-    const ro = new ResizeObserver(hitung);
-    if (alatRef.current) ro.observe(alatRef.current);
-    if (pojokRef.current) ro.observe(pojokRef.current);
-    window.addEventListener('resize', hitung);
-    return () => { ro.disconnect(); window.removeEventListener('resize', hitung); };
-  }, [aksi, alatTutup, letakAlat]);
-
-  /* ── BILAH ALAT MELIPAT SENDIRI ────────────────────────────────────
-     Hanya saat tidak ada alat yang sedang aktif — bilah yang melipat di
-     tengah orang menarik garis fibonacci adalah kerusakan, bukan fitur.
-     Penghitungnya disetel ulang tiap pointer menyentuh atau masuk ke
-     areanya. */
-  const [sentuhAlat, setSentuhAlat] = useState(0);
-  const bangunkanAlat = () => setSentuhAlat((n) => n + 1);
-  useEffect(() => {
-    if (alatTutup || alat) return;
-    const t = setTimeout(() => aturAlatTutup(true), JEDA_LIPAT_ALAT_MS);
-    return () => clearTimeout(t);
-  }, [alatTutup, alat, sentuhAlat]);
-
-  /* Satu tempat menghitung posisi bilah alat, dipakai kedua wujudnya
-     (terlipat dan terbuka) supaya keduanya tidak pernah menyimpang. */
-  const gayaAlat: React.CSSProperties = letakAlat
-    ? { left: letakAlat.x + kiriTotal, top: letakAlat.y,
-        transform: geserAlat ? `translateY(${geserAlat}px)` : undefined }
-    /* `left` inline juga untuk letak bawaannya — kelas `left-2` tidak bisa
-       ikut bergeser saat panel kirinya membuka, dan bilah yang bawaannya
-       menimpa daftar adalah cacat yang dilihat orang lebih dulu daripada
-       bilah yang pernah dipindah. */
-    : { left: kiriTotal + 8,
-        transform: `translateY(calc(-50% + ${geserAlat}px))` };
-
-  function aturAlatTutup(v: boolean) {
-    setAlatTutup(v);
-    try { localStorage.setItem('jt.alatTutup', v ? '1' : '0'); } catch { /* privat */ }
-  }
   function bukaDock(t: 'editor' | 'input') {
     /* Watchlist tidak lagi perlu ditutup di sini: ia kolom sendiri,
        tidak menindih dock Pine yang meluncur di atas grafik. */
@@ -5356,7 +5231,7 @@ ${pnlSunting !== null
 
               Jiplak TIDAK dipindah: panel acuannya memang harus sejajar
               dengan kanvas, dan ia tetap di dalam ChartLilin. */}
-          <PanelBelah tinggi={tinggiChart} onLebar={setSisaKiri}
+          <PanelBelah tinggi={tinggiChart}
             /* Screener membawa kartu selebar layar; 28% membuatnya terpotong
                jadi satu kolom sempit. Daftar dompet tetap 28% -- isinya baris
                teks pendek, dan melebarkannya cuma memakan chart. */
@@ -5430,6 +5305,16 @@ ${pnlSunting !== null
                   navigasi({ search: q.toString() ? '?' + q.toString() : '' }, { replace: true });
                 }} />
             ) : undefined}>
+          {/* ── BILAH GAMBAR SEBAGAI KOLOM ────────────────────────────
+              Menempel di tepi kiri dan MENDORONG chart, bukan mengambang di
+              atas lilin — lihat kepala components/bilah-gambar.tsx. Ia di
+              luar ChartLilin karena ChartLilin dibongkar-pasang tiap simbol
+              atau timeframe berganti; bilahnya tidak boleh ikut berkedip. */}
+          <div className="relative flex min-w-0">
+            <BilahGambar setelan={bilah} alat={alat} onAlat={setAlat}
+              jumlahGambar={gambarAlat.length} adaPilihan={!!gambarPilih}
+              onHapus={hapusGambar} kiriTerlipat={sisaKiriDalam} />
+            <div className="min-w-0 flex-1">
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           refKoordinat={koordinatUbah}
@@ -5491,6 +5376,8 @@ ${pnlSunting !== null
                             lepasSunting();
                           }}
                           onLebarKiri={setSisaKiriDalam}
+                          kursor={bilah.kursor} magnet={bilah.magnet}
+                          kunciGambar={bilah.kunci} sembunyiGambar={bilah.sembunyi}
                           panelKiri={dexBuka ? (
                             <div className="flex h-full flex-col">
                               <div className="flex items-center gap-2 border-b border-zinc-800 px-2.5 py-1.5">
@@ -6115,6 +6002,8 @@ ${pnlSunting !== null
                     </>
                   ) : 'Tidak ada data untuk simbol ini.'}
               </div>}
+            </div>
+          </div>
           </PanelBelah>
 
           {/* ── Bilah SUNTING order ────────────────────────────────
@@ -6455,119 +6344,6 @@ ${pnlSunting !== null
                 pindah ke baris skrip di panel itu. */}
           </div>
 
-          {/* ── Alat gambar — bilah TEGAK di sisi kiri chart ─────────
-              Tegak seperti TradingView: itu bentuk yang sudah dikenali
-              tangan, dan tinggi chart selalu lebih longgar daripada
-              lebarnya — bilah mendatar memakan lebar yang justru dipakai
-              membaca lilin.
-
-              Bentrokan lama dengan panel order (keduanya dulu di pojok
-              kiri atas) sudah tidak berlaku: bilahnya duduk di kiri-TENGAH
-              dan tetap bisa diseret ke mana saja.
-
-              Klik gambar (mode kursor) untuk memilihnya, Delete untuk
-              menghapus; penghapus menghapus yang terpilih dulu, semuanya
-              kalau tidak ada yang terpilih. */}
-          {/* `gayaAlat`: posisi + geseran menghindar tiket order, digabung.
-              -translate-y-1/2 pindah dari kelas ke gaya inline karena
-              transform inline mengalahkan kelas Tailwind — dua-duanya
-              tidak bisa hidup berdampingan, dan yang kalah jadi hilang
-              tanpa suara. */}
-          {alatTutup ? (
-            <button onClick={() => aturAlatTutup(false)} title="Buka bilah alat gambar"
-              ref={(el) => { alatRef.current = el; }}
-              onPointerEnter={bangunkanAlat}
-              style={gayaAlat}
-              className={cn('absolute z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-[color,transform] duration-300 hover:text-zinc-200',
-                !letakAlat && 'top-1/2')}>
-              <Ruler className="size-3.5" />
-            </button>
-          ) : (
-          <div onPointerDown={(e) => { bangunkanAlat(); mulaiSeretAlat(e); }}
-               onPointerEnter={bangunkanAlat}
-               ref={(el) => { alatRef.current = el; }}
-               style={gayaAlat}
-               className={cn('absolute z-20 flex cursor-move touch-none flex-col items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm transition-transform duration-300',
-                 !letakAlat && 'top-1/2')}>
-            {/* Pegangan seret di ujung ATAS — memberi tahu bilahnya bisa
-                dipindah tanpa perlu dicoba dulu. GripHorizontal, bukan
-                Vertical: titik-titiknya harus melintang terhadap arah
-                bilahnya supaya terbaca sebagai pegangan, bukan sebagai
-                tombol keempat yang kebetulan bergaris. */}
-            <GripHorizontal className="size-3.5 shrink-0 text-zinc-700" />
-            {/* ── KENAPA JIPLAK TIDAK ADA DI SINI LAGI ──────────────────
-                Dulu tombolnya duduk di bilah ini, digerbangi `pemilik`.
-                Gerbangnya benar, tapi tempatnya salah: bilah alat gambar
-                adalah perkakas trading yang dipakai SEMUA pengguna, dan
-                menaruh pintu ke arsip pribadi di tengahnya berarti satu
-                gerbang yang keliru — satu kali salah membaca peran, satu
-                kali render sebelum peran terbaca — memamerkan sesuatu yang
-                tidak boleh terlihat.
-
-                Sekarang jalan masuknya cuma satu: daftar arsip di ruang
-                analis, yang menautkan `?jiplak=<id>` dan sudah digerbangi
-                di sisi server. Jalan keluarnya ikut pindah, ke tombol ✕ di
-                gambar acuannya sendiri. */}
-            {([
-              ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik', ''],
-              /* Garis harga: sekali klik, bukan tarikan. Ditaruh tepat di
-                 bawah garis tren karena keduanya sama-sama "garis" bagi yang
-                 mencarinya — yang membedakan cuma satu miring, satu mendatar
-                 menancap di harga. */
-              ['rayH', MoveRight, 'Garis harga — klik sekali di level yang mau ditandai, menjulur ke kanan', 'text-amber-400'],
-              ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik', ''],
-              ['fib', Rows3, 'Fibonacci retracement — tarik dari swing ke swing', ''],
-              ['kotak', Square, 'Kotak SNR manual — tarik membentuk zonanya', ''],
-              /* Dua tombol, satu alat. Arahnya harus ditentukan SEBELUM
-                 ditempel — kalau tidak, sekali klik tidak cukup untuk tahu
-                 mana target dan mana stop.
-
-                 Ikonnya kotak berpanah: bentuk alatnya sendiri, plus arah
-                 yang dituju. Diberi warna karena dua tombol bersebelahan
-                 yang bentuknya nyaris sama dibedakan mata lewat warna dulu,
-                 baru arah panahnya — dan hijau/merah di sini bukan hiasan,
-                 itu warna yang persis akan muncul di chart. */
-              ['posisiBeli', SquareArrowUp, 'Posisi BELI — klik sekali di chart, kotak SL/TP langsung tertempel', 'text-emerald-500'],
-              ['posisiJual', SquareArrowDown, 'Posisi JUAL — klik sekali di chart, kotak SL/TP langsung tertempel', 'text-red-400'],
-            ] as const).map(([j, Ikon, judul, warna]) => (
-              <button key={j} onClick={() => setAlat(alat === j ? null : j)} title={judul}
-                className={cn('flex size-7 cursor-pointer items-center justify-center rounded transition-colors',
-                  alat === j ? 'bg-zinc-100 text-zinc-950'
-                    : cn(warna || 'text-zinc-400', 'hover:bg-zinc-800 hover:text-zinc-100'))}>
-                <Ikon className="size-3.5" />
-              </button>
-            ))}
-            <button
-              onClick={() => {
-                if (gambarPilih) {
-                  catatRiwayat();
-                  setGambarAlat((d) => {
-                    const b = d.filter((g) => g.id !== gambarPilih);
-                    simpanAlat(simbol, b);
-                    return b;
-                  });
-                  setGambarPilih(null);
-                  return;
-                }
-                if (!gambarAlat.length) return;
-                if (!confirm(`Hapus ${gambarAlat.length} gambar di ${simbol}? Berlaku di semua timeframe.`)) return;
-                /* Justru yang PALING perlu bisa diurung: satu klik keliru di
-                   sini menghapus seluruh gambar di simbol ini sekaligus. */
-                catatRiwayat();
-                setGambarAlat([]);
-                simpanAlat(simbol, []);
-              }}
-              disabled={!gambarAlat.length && !gambarPilih}
-              title={gambarPilih ? 'Hapus gambar terpilih (Delete)' : 'Hapus semua gambar di simbol ini (semua timeframe)'}
-              className="flex size-7 cursor-pointer items-center justify-center rounded text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-35">
-              <Eraser className="size-3.5" />
-            </button>
-            <button onClick={() => aturAlatTutup(true)} title="Lipat bilah alat"
-              className="flex size-7 cursor-pointer items-center justify-center rounded text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-300">
-              <Minus className="size-3.5" />
-            </button>
-          </div>
-          )}
 
           </div>
 

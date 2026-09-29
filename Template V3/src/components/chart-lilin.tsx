@@ -10,7 +10,7 @@ import { cn, harga as fHarga } from '@/lib/utils';
 import type { TradeUji } from '@/lib/backtest';
 import type { SegmenPine, PenandaPine, KotakPine, IsianPine } from '@/lib/pine-bar';
 import { PenggambarIsi } from '@/lib/plugin-isi';
-import { PenggambarAlat, type GambarAlat, type AlatPegang } from '@/lib/plugin-alat';
+import { PenggambarAlat, jarakKeGaris, type GambarAlat, type AlatPegang } from '@/lib/plugin-alat';
 import { PenggambarJenuh } from '@/lib/plugin-jenuh';
 import { useTema, temaSekarang, WARNA_CHART } from '@/lib/tema';
 
@@ -258,10 +258,29 @@ export interface PosisiChartMt5 {
  *  area gambar (sebelum skala harga). */
 export type KoordinatChart = (harga: number) => { y: number; kanan: number; xAkhir: number | null } | null;
 
+/* Kursor mode Titik: bulatan putih bercincin gelap, titik panasnya di
+   tengah. Terbaca di atas lilin hijau maupun merah, dan di tema terang. */
+const KURSOR_TITIK = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Ccircle cx='6' cy='6' r='3' fill='%23fafafa' stroke='%2309090b' stroke-width='1.5'/%3E%3C/svg%3E\") 6 6, crosshair";
+
+/** Bentuk yang ditarik dari sudut ke sudut — cuma mereka yang punya
+ *  pegangan di sudut-silang. */
+const JENIS_KOTAK = new Set(['kotak', 'ukur', 'fib', 'ukurHarga', 'ukurWaktu']);
+
+/** Di dalam pita channel? Diuji per kolom x: di antara garis dasar dan
+ *  garis sejajar pada x yang sama. */
+function dalamChannel(px: number, py: number, x1: number, y1: number, x2: number, y2: number,
+                      ya: number, yb: number): boolean {
+  if (x2 === x1 || px < Math.min(x1, x2) || px > Math.max(x1, x2)) return false;
+  const f = (px - x1) / (x2 - x1);
+  const yDasar = y1 + f * (y2 - y1), ySejajar = ya + f * (yb - ya);
+  return py >= Math.min(yDasar, ySejajar) && py <= Math.max(yDasar, ySejajar);
+}
+
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, redupDari, pusatkanBar, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, garisKlik, onKlikGarisOrder, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
+  kursor = 'silang', magnet = 'mati', kunciGambar = false, sembunyiGambar = false,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, muatPenuh, bagikanFoto, tandaAir, tampilan, pitaSmi,
   jiplak, onUbahJiplak, onLepasJiplak, panelKiri, onLebarKiri,
   hamparanBarTertua, onUjungKiri, refKoordinat,
@@ -395,6 +414,17 @@ export function ChartLilin({
   alat?: AlatPegang | null;
   /** Dipanggil saat satu tarikan alat selesai. */
   onAlatSelesai?: (g: Omit<GambarAlat, 'id'>) => void;
+  /** Rupa kursor saat TIDAK memegang alat — kelompok Kursor di bilah
+   *  gambar: silang (garis bidik + kursor silang), titik (garis bidik +
+   *  kursor titik), panah (kursor biasa, tanpa garis bidik). */
+  kursor?: 'silang' | 'titik' | 'panah';
+  /** Magnet: titik gambar menempel ke OHLC lilin di bawahnya. Lemah hanya
+   *  kalau kursornya sudah dekat (16 px); kuat selalu. */
+  magnet?: 'mati' | 'lemah' | 'kuat';
+  /** Gambar dikunci: tidak bisa dipilih maupun digeser. */
+  kunciGambar?: boolean;
+  /** Gambar disembunyikan — tidak digambar, tidak bisa dipilih. */
+  sembunyiGambar?: boolean;
   /** Gambar tangan yang sudah jadi — ukur, fib, kotak. */
   gambarAlat?: GambarAlat[];
   /** Gambar yang sedang terpilih (bingkai + pegangan). */
@@ -403,7 +433,7 @@ export function ChartLilin({
   onPilihGambar?: (id: string | null) => void;
   /** Gambar terpilih digeser utuh, atau salah satu ujungnya ditarik.
    *  Tanpa handler ini gambar tetap beku setelah tertempel. */
-  onUbahGambar?: (id: string, ubah: Partial<Pick<GambarAlat, 't1' | 'h1' | 't2' | 'h2' | 'h3'>>) => void;
+  onUbahGambar?: (id: string, ubah: Partial<Pick<GambarAlat, 't1' | 'h1' | 't2' | 'h2' | 'h3' | 'titik'>>) => void;
   /** Posisi MT5 terbuka — price line entry/SL/TP + PnL + seret SL/TP. */
   /** Chart acuan yang dipasang BERDAMPINGAN, bukan ditumpuk.
    *
@@ -1514,15 +1544,29 @@ export function ChartLilin({
      waktu, jadi gambarnya tidak merayap saat lilin baru lahir. */
   useEffect(() => {
     const n = lilin.times.length;
-    alatPrim.current?.setData(gambarAlat ?? [], { tAkhir: n ? lilin.times[n - 1] : 0, tfMs, n });
-  }, [gambarAlat, lilin]);
+    alatPrim.current?.setData(sembunyiGambar ? [] : (gambarAlat ?? []), { tAkhir: n ? lilin.times[n - 1] : 0, tfMs, n });
+  }, [gambarAlat, lilin, sembunyiGambar]);
 
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
-    c.applyOptions({ handleScroll: !alat, handleScale: !alat });
-    if (kotak.current) kotak.current.style.cursor = alat ? 'crosshair' : '';
-  }, [alat]);
+    /* Mode Panah mematikan garis bidik — persis seperti TradingView: orang
+       yang memilih panah ingin melihat chart tanpa garis yang mengikuti
+       tetikus. Saat memegang alat garis bidik selalu hidup, karena di situ
+       ia justru penunjuk tempat titik gambarnya akan jatuh. */
+    const bidik = !!alat || kursor !== 'panah';
+    c.applyOptions({
+      handleScroll: !alat, handleScale: !alat,
+      crosshair: {
+        vertLine: { visible: bidik, labelVisible: bidik },
+        horzLine: { visible: bidik, labelVisible: bidik },
+      },
+    });
+    if (kotak.current) {
+      kotak.current.style.cursor = alat || kursor === 'silang' ? 'crosshair'
+        : kursor === 'titik' ? KURSOR_TITIK : 'default';
+    }
+  }, [alat, kursor]);
 
   useEffect(() => { alatPrim.current?.setPilih(gambarPilih ?? null); }, [gambarPilih]);
   /* Dibaca di dalam penangan mousedown yang dipasang SEKALI — kalau dibaca
@@ -1535,8 +1579,72 @@ export function ChartLilin({
      Klik = mousedown+mouseup yang nyaris tidak bergerak; seretan panning
      chart bukan pilihan. Uji-kenanya kotak pembatas berpelonggar 8 px —
      garis setipis 1 px mustahil diklik persis. */
-  const acuanPilih = useRef({ alat, gambarAlat });
-  acuanPilih.current = { alat, gambarAlat };
+  const acuanPilih = useRef({ alat, gambarAlat, kunci: kunciGambar || sembunyiGambar, magnet });
+  acuanPilih.current = { alat, gambarAlat, kunci: kunciGambar || sembunyiGambar, magnet };
+
+  /* ── MAGNET ─────────────────────────────────────────────────────────────
+     Menempelkan titik gambar ke open/high/low/close lilin di bawah kursor —
+     yang paling dekat DI LAYAR, bukan dalam harga, karena yang dibidik orang
+     adalah ujung sumbu atau badan lilin yang ia lihat. Waktunya ikut
+     menempel ke awal bar-nya.
+
+     Hanya di atas data. Di ruang kosong sebelah kanan tidak ada lilin untuk
+     ditempeli, dan di mode replay lilin sesudah titik replay belum
+     "terjadi" — menempel ke sana berarti membocorkan harga masa depan. */
+  const tempelMagnet = (t: number, h: number, y: number): { t: number; h: number } => {
+    const m = acuanPilih.current.magnet;
+    const s = seri.current;
+    if (!m || m === 'mati' || !s) return { t, h };
+    const L = acuan.current.lilin;
+    const times = L.times;
+    const akhir = times.length - 1;
+    if (akhir < 0 || t < times[0] || t >= times[akhir] + tfRef.current) return { t, h };
+    let lo = 0, hi = akhir;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (times[mid] <= t) lo = mid; else hi = mid - 1;
+    }
+    const batas = acuan.current.hingga;
+    if (typeof batas === 'number' && lo > batas) return { t, h };
+    let terbaik = h, jarak = Infinity;
+    for (const v of [L.opens[lo], L.highs[lo], L.lows[lo], L.closes[lo]]) {
+      if (typeof v !== 'number' || !isFinite(v)) continue;
+      const yy = s.priceToCoordinate(v);
+      if (yy == null) continue;
+      const d = Math.abs(yy - y);
+      if (d < jarak) { jarak = d; terbaik = v; }
+    }
+    if (m === 'lemah' && jarak > 16) return { t, h };
+    return { t: times[lo], h: terbaik };
+  };
+
+  /* Titik goresan kuas dalam piksel — satu fungsi untuk uji-kena DAN seret,
+     supaya goresan yang bisa diklik dan yang bisa diseret selalu sama. */
+  const pikselKuas = (g: GambarAlat): [number, number][] => {
+    const c = chart.current, s = seri.current;
+    if (!c || !s) return [];
+    const times = acuan.current.lilin.times;
+    const X = (t: number): number | null => {
+      const x = c.timeScale().timeToCoordinate(Math.floor(t / 1000) as Time);
+      if (x != null) return x;
+      if (times.length < 2) return null;
+      return c.timeScale().logicalToCoordinate((times.length - 1 + (t - times[times.length - 1]) / tfRef.current) as Logical);
+    };
+    const out: [number, number][] = [];
+    for (const [t, h] of g.titik ?? []) {
+      const x = X(t), y = s.priceToCoordinate(h);
+      if (x != null && y != null) out.push([x, y]);
+    }
+    return out;
+  };
+  const kenaKuas = (g: GambarAlat, px: number, py: number): boolean => {
+    const pts = pikselKuas(g);
+    if (pts.length === 1) return Math.hypot(px - pts[0][0], py - pts[0][1]) <= 7;
+    for (let i = 1; i < pts.length; i++) {
+      if (jarakKeGaris(px, py, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]) <= 7) return true;
+    }
+    return false;
+  };
   useEffect(() => {
     if (!onPilihGambar) return;
     const el = kotak.current;
@@ -1545,7 +1653,7 @@ export function ChartLilin({
     const turun = (e: MouseEvent) => { awal = { x: e.clientX, y: e.clientY }; };
     const klik = (e: MouseEvent) => {
       const { alat: a, gambarAlat: gs } = acuanPilih.current;
-      if (a) return;
+      if (a || acuanPilih.current.kunci) return;
       if (awal && Math.hypot(e.clientX - awal.x, e.clientY - awal.y) > 5) return;
       const c = chart.current, s = seri.current;
       if (!c || !s) return;
@@ -1574,6 +1682,27 @@ export function ChartLilin({
           if (px >= x1 - 8 && Math.abs(py - y1) <= 7) { kena = g.id; break; }
           continue;
         }
+        /* Garis selebar/setinggi panel: yang diuji cuma satu sumbu — klik
+           di mana pun sejajar garisnya adalah klik pada garis itu. */
+        if (g.jenis === 'garisH') { if (Math.abs(py - y1) <= 7) { kena = g.id; break; } continue; }
+        if (g.jenis === 'garisV') { if (Math.abs(px - x1) <= 7) { kena = g.id; break; } continue; }
+        if (g.jenis === 'sinar' || g.jenis === 'garisPanjang' || g.jenis === 'panah') {
+          const tA = g.jenis === 'garisPanjang' ? -Infinity : 0;
+          const tB = g.jenis === 'panah' ? 1 : Infinity;
+          if (jarakKeGaris(px, py, x1, y1, x2, y2, tA, tB) <= 7) { kena = g.id; break; }
+          continue;
+        }
+        if (g.jenis === 'channel') {
+          const d = g.h3 ?? 0;
+          const ya = s.priceToCoordinate(g.h1 + d), yb = s.priceToCoordinate(g.h2 + d);
+          if (jarakKeGaris(px, py, x1, y1, x2, y2) <= 7
+            || (ya != null && yb != null
+                && (jarakKeGaris(px, py, x1, ya, x2, yb) <= 7 || dalamChannel(px, py, x1, y1, x2, y2, ya, yb)))) {
+            kena = g.id; break;
+          }
+          continue;
+        }
+        if (g.jenis === 'kuas') { if (kenaKuas(g, px, py)) { kena = g.id; break; } continue; }
         if (g.jenis === 'garis') {
           /* Garis tren diagonal: kotak pembatasnya luas — yang diuji JARAK
              ke ruasnya, supaya hanya klik di dekat garisnya yang memilih,
@@ -1614,7 +1743,7 @@ export function ChartLilin({
      ikut bergeser di tengah seretan (harga baru masuk) tidak menyeret
      gambarnya ikut pindah. */
   const seretGambar = useRef<
-    { id: string; mode: 'geser' | 'ujung1' | 'ujung2' | 'tp' | 'sl'; awal: GambarAlat; t: number; h: number } | null
+    { id: string; mode: 'geser' | 'ujung1' | 'ujung2' | 'tp' | 'sl' | 'lebar'; awal: GambarAlat; t: number; h: number } | null
   >(null);
 
   useEffect(() => {
@@ -1655,13 +1784,16 @@ export function ChartLilin({
       const y1 = s.priceToCoordinate(g.h1), y2 = s.priceToCoordinate(g.h2);
       if (x1 == null || x2 == null || y1 == null || y2 == null) return null;
       const y3 = g.jenis === 'posisi' ? s.priceToCoordinate(g.h3 ?? g.h1) : null;
-      return { x1, y1, x2, y2, y3 };
+      /* Garis sejajar channel — h3 di sana SELISIH harga, bukan harga. */
+      const ya = g.jenis === 'channel' ? s.priceToCoordinate(g.h1 + (g.h3 ?? 0)) : null;
+      const yb = g.jenis === 'channel' ? s.priceToCoordinate(g.h2 + (g.h3 ?? 0)) : null;
+      return { x1, y1, x2, y2, y3, ya, yb };
     };
 
     const turun = (e: MouseEvent) => {
       if (e.button !== 0) return;
       const { alat: a, gambarAlat: gs } = acuanPilih.current;
-      if (a) return;                       // sedang memegang alat: itu menggambar baru
+      if (a || acuanPilih.current.kunci) return;   // memegang alat = menggambar baru; terkunci = diam
       const pilihId = pilihRef.current;
       if (!pilihId) return;                // hanya gambar TERPILIH yang bisa digeser
       const g = (gs ?? []).find((x) => x.id === pilihId);
@@ -1673,7 +1805,7 @@ export function ChartLilin({
       /* Pegangan menang atas badan: ujung yang berada di dalam badan kotak
          tetap harus bisa ditarik sendiri. */
       const dekat = (hx: number, hy: number) => Math.hypot(p.x - hx, p.y - hy) <= 9;
-      let mode: 'geser' | 'ujung1' | 'ujung2' | 'tp' | 'sl' | null = null;
+      let mode: 'geser' | 'ujung1' | 'ujung2' | 'tp' | 'sl' | 'lebar' | null = null;
       if (g.jenis === 'posisi') {
         /* Pegangan alat posisi TIDAK di sudut kotak. Menarik sudut akan
            menggeser waktu dan harga sekaligus, dan menggeser TP tanpa
@@ -1692,13 +1824,37 @@ export function ChartLilin({
           if (p.x >= kr - 4 && p.x <= kn + 4 && p.y >= atas - 4 && p.y <= bawah + 4) mode = 'geser';
         }
       }
+      /* Kuas cuma bisa digeser utuh; garis selebar/setinggi panel digeser
+         dari titik mana pun di sepanjang garisnya. */
+      else if (g.jenis === 'kuas') { if (kenaKuas(g, p.x, p.y)) mode = 'geser'; }
+      else if (g.jenis === 'garisH') { if (Math.abs(p.y - k.y1) <= 7) mode = 'geser'; }
+      else if (g.jenis === 'garisV') { if (Math.abs(p.x - k.x1) <= 7) mode = 'geser'; }
+      /* Pegangan LEBAR channel di tengah garis sejajarnya. Diuji sebelum
+         ujung-ujung garis dasar supaya tidak direbut saat channel-nya sempit. */
+      else if (g.jenis === 'channel' && k.ya != null && k.yb != null
+               && dekat((k.x1 + k.x2) / 2, (k.ya + k.yb) / 2)) mode = 'lebar';
       else if (dekat(k.x1, k.y1)) mode = 'ujung1';
       else if (dekat(k.x2, k.y2)) mode = 'ujung2';
-      else if (g.jenis !== 'garis' && dekat(k.x1, k.y2)) mode = 'ujung1';
-      else if (g.jenis !== 'garis' && dekat(k.x2, k.y1)) mode = 'ujung2';
+      /* Sudut-silang hanya untuk bentuk KOTAK — garis tidak punya sudut
+         di sana, jadi pegangan tak kasatmata itu cuma akan merebut klik. */
+      else if (JENIS_KOTAK.has(g.jenis) && dekat(k.x1, k.y2)) mode = 'ujung1';
+      else if (JENIS_KOTAK.has(g.jenis) && dekat(k.x2, k.y1)) mode = 'ujung2';
       else {
         /* Di dalam badannya? Untuk garis: dekat ruasnya. Untuk yang lain:
            di dalam kotaknya. */
+        if (g.jenis === 'sinar' || g.jenis === 'garisPanjang' || g.jenis === 'panah') {
+          const tA = g.jenis === 'garisPanjang' ? -Infinity : 0;
+          const tB = g.jenis === 'panah' ? 1 : Infinity;
+          if (jarakKeGaris(p.x, p.y, k.x1, k.y1, k.x2, k.y2, tA, tB) <= 7) mode = 'geser';
+        } else if (g.jenis === 'rayH') {
+          /* Sepanjang rayanya ke kanan, bukan cuma di pangkalnya. */
+          if (p.x >= k.x1 - 4 && Math.abs(p.y - k.y1) <= 7) mode = 'geser';
+        } else if (g.jenis === 'channel') {
+          if (jarakKeGaris(p.x, p.y, k.x1, k.y1, k.x2, k.y2) <= 7
+            || (k.ya != null && k.yb != null
+                && (jarakKeGaris(p.x, p.y, k.x1, k.ya, k.x2, k.yb) <= 7
+                    || dalamChannel(p.x, p.y, k.x1, k.y1, k.x2, k.y2, k.ya, k.yb)))) mode = 'geser';
+        } else
         if (g.jenis === 'garis') {
           const dx = k.x2 - k.x1, dy = k.y2 - k.y1;
           const pj = dx * dx + dy * dy;
@@ -1713,7 +1869,7 @@ export function ChartLilin({
 
       seretGambar.current = { id: g.id, mode, awal: { ...g }, t: p.t, h: p.h };
       document.body.style.cursor = mode === 'geser' ? 'move'
-        : mode === 'tp' || mode === 'sl' ? 'ns-resize'
+        : mode === 'tp' || mode === 'sl' || mode === 'lebar' ? 'ns-resize'
         : g.jenis === 'posisi' ? 'ew-resize' : 'grabbing';
       chart.current?.applyOptions({ handleScroll: false, handleScale: false });
       e.preventDefault();
@@ -1745,13 +1901,32 @@ export function ChartLilin({
         else onUbahGambar(sg.id, { h3: p.h });
         return;
       }
+      if (sg.mode === 'lebar') {
+        onUbahGambar(sg.id, { h3: (a.h3 ?? 0) + (p.h - sg.h) });
+        return;
+      }
       if (sg.mode === 'geser') {
         const dt = p.t - sg.t, dh = p.h - sg.h;
+        /* Kuas membawa seluruh titik goresannya, bukan cuma dua ujung. */
+        if (a.jenis === 'kuas') {
+          onUbahGambar(sg.id, {
+            t1: a.t1 + dt, h1: a.h1 + dh, t2: a.t2 + dt, h2: a.h2 + dh,
+            titik: (a.titik ?? []).map(([t, h]) => [t + dt, h + dh] as [number, number]),
+          });
+          return;
+        }
         onUbahGambar(sg.id, { t1: a.t1 + dt, h1: a.h1 + dh, t2: a.t2 + dt, h2: a.h2 + dh });
-      } else if (sg.mode === 'ujung1') {
-        onUbahGambar(sg.id, { t1: p.t, h1: p.h });
+        return;
+      }
+      /* Ujung yang ditarik ikut MAGNET — sama seperti saat menggambar. */
+      const m = tempelMagnet(p.t, p.h, p.y);
+      if (sg.mode === 'ujung1') {
+        /* Gambar satu titik (garis harga, horizontal, vertikal): kedua
+           ujungnya selalu sama, jadi ujung kedua ikut. */
+        const satuTitik = a.jenis === 'rayH' || a.jenis === 'garisH' || a.jenis === 'garisV';
+        onUbahGambar(sg.id, satuTitik ? { t1: m.t, h1: m.h, t2: m.t, h2: m.h } : { t1: m.t, h1: m.h });
       } else {
-        onUbahGambar(sg.id, { t2: p.t, h2: p.h });
+        onUbahGambar(sg.id, { t2: m.t, h2: m.h });
       }
     };
 
@@ -1781,13 +1956,13 @@ export function ChartLilin({
     };
   }, [onUbahGambar]);
 
-  const tarikAlat = useRef<{ t1: number; h1: number } | null>(null);
+  const tarikAlat = useRef<{ t1: number; h1: number; d: number } | null>(null);
   useEffect(() => {
     if (!alat || !onAlatSelesai) return;
     const el = kotak.current;
     if (!el) return;
 
-    const posisiDari = (e: MouseEvent): { t: number; h: number } | null => {
+    const posisiDari = (e: MouseEvent, bolehMagnet = true): { t: number; h: number } | null => {
       const c = chart.current, s = seri.current;
       if (!c || !s) return null;
       const rect = el.getBoundingClientRect();
@@ -1799,7 +1974,7 @@ export function ChartLilin({
       /* Waktu dari koordinat; di luar data (kanan lilin terakhir) jatuh ke
          sumbu logika + durasi timeframe. */
       const t = c.timeScale().coordinateToTime(x);
-      if (t != null) return { t: (t as number) * 1000, h };
+      if (t != null) return bolehMagnet ? tempelMagnet((t as number) * 1000, h, y) : { t: (t as number) * 1000, h };
       const l = c.timeScale().coordinateToLogical(x);
       const times = acuan.current.lilin.times;
       if (l == null || times.length < 2) return null;
@@ -1829,17 +2004,76 @@ export function ChartLilin({
        Ditarik seperti alat lain akan menuntut dua titik untuk sesuatu yang
        cuma punya satu nilai berarti — harganya. Tarikan mendatar yang
        tidak boleh mengubah apa pun adalah gerakan yang menipu. */
-    if (alat === 'rayH') {
+    /* Garis horizontal & vertikal ikut jalur sekali-klik yang sama: yang
+       ditentukan orang cuma SATU nilai — harga, atau saat. */
+    if (alat === 'rayH' || alat === 'garisH' || alat === 'garisV') {
+      const jenisSatu = alat;
       const tempelRay = (e: PointerEvent) => {
         if (e.button !== 0) return;
         const p = posisiDari(e);
         if (!p) return;
-        onAlatSelesai({ jenis: 'rayH', t1: p.t, h1: p.h, t2: p.t, h2: p.h });
+        onAlatSelesai({ jenis: jenisSatu, t1: p.t, h1: p.h, t2: p.t, h2: p.h });
         e.preventDefault();
         e.stopPropagation();
       };
       el.addEventListener('pointerdown', tempelRay);
       return () => el.removeEventListener('pointerdown', tempelRay);
+    }
+
+    /* ── KUAS ─────────────────────────────────────────────────────────────
+       Goresan bebas: titik ditambahkan tiap kursor bergeser ≥3 px, TANPA
+       magnet — goresan yang melompat-lompat ke OHLC bukan lagi goresan
+       tangan. Klik tanpa gerakan tidak menghasilkan apa pun. */
+    if (alat === 'kuas') {
+      let titik: [number, number][] = [];
+      let akhirPx: { x: number; y: number } | null = null;
+      const tampil = () => {
+        if (!titik.length) return;
+        const [a0, a1] = titik[0], [z0, z1] = titik[titik.length - 1];
+        alatPrim.current?.setPratinjau({ jenis: 'kuas', t1: a0, h1: a1, t2: z0, h2: z1, titik });
+      };
+      const turunK = (e: PointerEvent) => {
+        if (e.button !== 0) return;
+        const p = posisiDari(e, false);
+        if (!p) return;
+        titik = [[p.t, p.h]];
+        akhirPx = { x: e.clientX, y: e.clientY };
+        tampil();
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      const gerakK = (e: PointerEvent) => {
+        if (!akhirPx || Math.hypot(e.clientX - akhirPx.x, e.clientY - akhirPx.y) < 3) return;
+        const p = posisiDari(e, false);
+        if (!p) return;
+        titik.push([p.t, p.h]);
+        akhirPx = { x: e.clientX, y: e.clientY };
+        tampil();
+      };
+      const lepasK = () => {
+        if (!akhirPx) return;
+        akhirPx = null;
+        alatPrim.current?.setPratinjau(null);
+        if (titik.length >= 2) {
+          const [a0, a1] = titik[0], [z0, z1] = titik[titik.length - 1];
+          onAlatSelesai({ jenis: 'kuas', t1: a0, h1: a1, t2: z0, h2: z1, titik: [...titik] });
+        }
+        titik = [];
+      };
+      const batalK = () => { akhirPx = null; titik = []; alatPrim.current?.setPratinjau(null); };
+      chart.current?.applyOptions({ handleScroll: false, handleScale: false });
+      el.addEventListener('pointerdown', turunK, true);
+      window.addEventListener('pointermove', gerakK);
+      window.addEventListener('pointerup', lepasK);
+      window.addEventListener('pointercancel', batalK);
+      return () => {
+        chart.current?.applyOptions({ handleScroll: true, handleScale: true });
+        el.removeEventListener('pointerdown', turunK, true);
+        window.removeEventListener('pointermove', gerakK);
+        window.removeEventListener('pointerup', lepasK);
+        window.removeEventListener('pointercancel', batalK);
+        alatPrim.current?.setPratinjau(null);
+      };
     }
 
     if (alat === 'posisiBeli' || alat === 'posisiJual') {
@@ -1903,15 +2137,25 @@ export function ChartLilin({
       };
     }
 
-    const bentuk = (t1: number, h1: number, t2: number, h2: number): Omit<GambarAlat, 'id'> =>
-      ({ jenis: alat, t1, h1, t2, h2 });
+    /* Channel membawa lebar awalnya (`d`, selisih harga garis sejajar):
+       40 px di bawah garis dasar pada saat tarikan dimulai — terlihat jelas
+       sebagai channel sejak awal, lalu disesuaikan lewat pegangan lebar. */
+    const bentuk = (t1: number, h1: number, t2: number, h2: number, d = 0): Omit<GambarAlat, 'id'> =>
+      (alat === 'channel' ? { jenis: alat, t1, h1, t2, h2, h3: d } : { jenis: alat, t1, h1, t2, h2 });
 
     const turun = (e: MouseEvent) => {
       if (e.button !== 0) return;
       const p = posisiDari(e);
       if (!p) return;
-      tarikAlat.current = { t1: p.t, h1: p.h };
-      alatPrim.current?.setPratinjau(bentuk(p.t, p.h, p.t, p.h));
+      let d = 0;
+      if (alat === 'channel') {
+        const s = seri.current;
+        const yy = s?.priceToCoordinate(p.h);
+        const hb = s && yy != null ? s.coordinateToPrice(yy + 40) : null;
+        if (typeof hb === 'number' && isFinite(hb)) d = hb - p.h;
+      }
+      tarikAlat.current = { t1: p.t, h1: p.h, d };
+      alatPrim.current?.setPratinjau(bentuk(p.t, p.h, p.t, p.h, d));
       e.preventDefault();
       e.stopPropagation();
     };
@@ -1920,7 +2164,7 @@ export function ChartLilin({
       if (!a) return;
       const p = posisiDari(e);
       if (!p) return;
-      alatPrim.current?.setPratinjau(bentuk(a.t1, a.h1, p.t, p.h));
+      alatPrim.current?.setPratinjau(bentuk(a.t1, a.h1, p.t, p.h, a.d));
     };
     const lepas = (e: MouseEvent) => {
       const a = tarikAlat.current;
@@ -1934,7 +2178,7 @@ export function ChartLilin({
          informasi apa pun. (Alat posisi justru sebaliknya: ia ditempel
          dengan sekali klik, dan tidak pernah sampai ke baris ini.) */
       if (p && (Math.abs(p.t - a.t1) > 1 || p.h !== a.h1)) {
-        onAlatSelesai(bentuk(a.t1, a.h1, p.t, p.h));
+        onAlatSelesai(bentuk(a.t1, a.h1, p.t, p.h, a.d));
       }
     };
     /* pointercancel ≠ pointerup: koordinat pada cancel tidak bisa
@@ -2773,11 +3017,11 @@ export function ChartLilin({
           (times.length - 1 + (t - times[times.length - 1]) / tfRef.current) as Logical);
       };
       for (const g of (acuanPilih.current.gambarAlat ?? [])) {
-        if (g.jenis !== 'rayH') continue;
+        if (g.jenis !== 'rayH' && g.jenis !== 'garisH') continue;
         const y1 = s.priceToCoordinate(g.h1);
         const x1 = X(g.t1);
         if (y1 == null || x1 == null) continue;
-        if (px >= x1 - 8 && Math.abs(py - y1) <= 7) {
+        if ((g.jenis === 'garisH' || px >= x1 - 8) && Math.abs(py - y1) <= 7) {
           /* Nilai awalnya harga garis itu sendiri, bukan kotak kosong:
              yang dilakukan orang di sini hampir selalu MEMBETULKAN angka
              yang sudah ada, bukan menulis dari nol. */
@@ -2807,7 +3051,8 @@ export function ChartLilin({
     const s = seri.current;
     if (!s) return;
     for (const g of (gambarAlat ?? [])) {
-      if (g.jenis !== 'rayH') continue;
+      if (sembunyiGambar) break;
+      if (g.jenis !== 'rayH' && g.jenis !== 'garisH') continue;
       try {
         garisRayHarga.current.push(s.createPriceLine({
           price: g.h1,
@@ -2824,7 +3069,7 @@ export function ChartLilin({
       garisRayHarga.current.forEach((g) => { try { s.removePriceLine(g); } catch { /* dibongkar */ } });
       garisRayHarga.current = [];
     };
-  }, [gambarAlat]);
+  }, [gambarAlat, sembunyiGambar]);
 
   /* Harga permintaan (ask): garis titik jarang — jaraknya ke garis harga
      bid adalah SPREAD, dan di emas spread bukan pembulatan. Garisnya

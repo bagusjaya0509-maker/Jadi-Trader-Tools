@@ -18,7 +18,26 @@ import type {
    bar terakhir + durasi timeframe.
    ════════════════════════════════════════════════════════════════════════ */
 
-export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis' | 'posisi' | 'rayH';
+/* ── JENIS BARU 29 SEP 2026: bilah gambar ala TradingView ─────────────
+   Diminta pemilik: alat gambar di Chart & Entry disamakan dengan bilah
+   kiri Hyperliquid (yang sebenarnya TradingView Advanced Charts — library
+   berlisensi, jadi tidak bisa diambil; yang dibuat di sini padanannya).
+
+     sinar         ray — dari titik 1 melewati titik 2 sampai tepi panel
+     garisPanjang  extended line — menjulur ke dua arah
+     garisH        horizontal line — sekali klik, selebar panel
+     garisV        vertical line — sekali klik, setinggi panel
+     channel       parallel channel — garis dasar + garis sejajar (h3)
+     panah         arrow — ruas dengan mata panah di titik 2
+     kuas          brush — goresan bebas (`titik`)
+     ukurHarga     price range — selisih harga & persen
+     ukurWaktu     date range — jumlah bar & durasi
+
+   Gambar lama tidak disentuh: medannya sama, dan jenis lama tetap
+   digambar persis seperti sebelumnya. */
+export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis' | 'posisi' | 'rayH'
+  | 'sinar' | 'garisPanjang' | 'garisH' | 'garisV' | 'channel' | 'panah' | 'kuas'
+  | 'ukurHarga' | 'ukurWaktu';
 
 /** Alat yang bisa DIPEGANG di bilah.
 
@@ -45,6 +64,14 @@ export interface GambarAlat {
   /** Arah posisi, hanya untuk jenis 'posisi'. Disimpan, bukan disimpulkan
       dari letak target — lihat alasannya di penggambarnya. */
   arah?: 'beli' | 'jual';
+  /* Untuk 'channel', `h3` BUKAN harga mutlak melainkan SELISIH harga garis
+     sejajar terhadap garis dasar. Selisih, supaya menarik salah satu ujung
+     garis dasar tidak mengubah lebar channel-nya — lebar itulah yang
+     sengaja ditentukan orangnya. */
+  /** Goresan, hanya untuk 'kuas': pasangan [waktu ms, harga]. t1/h1 dan
+      t2/h2 tetap diisi titik pertama & terakhir supaya semua jalur yang
+      memeriksa kedua ujung tetap bekerja tanpa cabang khusus. */
+  titik?: [number, number][];
 }
 
 interface MetaAlat { tAkhir: number; tfMs: number; n: number }
@@ -54,6 +81,63 @@ interface TargetKanvas { useMediaCoordinateSpace(f: (ruang: RuangMedia) => void)
 
 /** Level fibonacci baku — urutan menggambar dari 0 ke 1. */
 const LEVEL_FIB = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+
+const BIRU = 'rgba(96,165,250,.95)';
+const KUNING = 'rgba(250,204,21,.95)';
+
+/** Potongan garis TAK BERUJUNG melalui (x1,y1)-(x2,y2) dengan persegi
+ *  0..w × 0..h (Liang–Barsky), sebagai parameter t: 0 = titik 1, 1 = titik
+ *  2. null kalau garisnya tidak melewati persegi, atau kedua titiknya sama.
+ *  Dipakai sinar & garis panjang, yang ujungnya ditentukan tepi panel. */
+export function potongGaris(
+  x1: number, y1: number, x2: number, y2: number, w: number, h: number,
+): { t0: number; t1: number } | null {
+  const dx = x2 - x1, dy = y2 - y1;
+  if (dx === 0 && dy === 0) return null;
+  let t0 = -Infinity, t1 = Infinity;
+  const p = [-dx, dx, -dy, dy];
+  const q = [x1, w - x1, y1, h - y1];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return null; continue; }
+    const r = q[i] / p[i];
+    if (p[i] < 0) t0 = Math.max(t0, r); else t1 = Math.min(t1, r);
+  }
+  return t0 <= t1 ? { t0, t1 } : null;
+}
+
+/** Jarak titik (px,py) ke garis (x1,y1)-(x2,y2) dengan parameter dibatasi
+ *  [tMin, tMax]: [0,1] ruas, [0,∞) sinar, (-∞,∞) garis penuh. Satu rumus
+ *  untuk uji-kena dan untuk memutuskan seretan — kalau dua tempat menulis
+ *  rumusnya sendiri, garis yang bisa diklik dan garis yang bisa diseret
+ *  pelan-pelan jadi dua garis yang berbeda. */
+export function jarakKeGaris(
+  px: number, py: number, x1: number, y1: number, x2: number, y2: number,
+  tMin = 0, tMax = 1,
+): number {
+  const dx = x2 - x1, dy = y2 - y1;
+  const pj = dx * dx + dy * dy;
+  if (!pj) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(tMin, Math.min(tMax, ((px - x1) * dx + (py - y1) * dy) / pj));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+/** Lama waktu untuk label rentang waktu: "3 hari 4 jam", "4 jam 20 mnt". */
+function durasiTeks(ms: number): string {
+  const mnt = Math.round(ms / 60_000);
+  const hari = Math.floor(mnt / 1440), jam = Math.floor((mnt % 1440) / 60), m = mnt % 60;
+  if (hari) return jam ? `${hari} hari ${jam} jam` : `${hari} hari`;
+  if (jam) return m ? `${jam} jam ${m} mnt` : `${jam} jam`;
+  return `${m} mnt`;
+}
+
+/** Selisih garis sejajar channel; 0 untuk gambar tanpa medan itu. */
+function d3OR(g: { h3?: number }): number { return g.h3 ?? 0; }
+
+function waktuTeks(t: number): string {
+  return new Date(t).toLocaleString('id-ID', {
+    day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit',
+  });
+}
 
 function hargaTeks(v: number): string {
   if (!isFinite(v)) return '—';
@@ -189,14 +273,25 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                  ditarik untuk diperpanjang. */
               const terpilih = 'id' in g && !!g.id && g.id === this.pilih;
               if (terpilih) {
-                const titik: [number, number][] = g.jenis === 'rayH'
+                const d3 = g.h3 ?? 0;
+                const titik: [number, number][] = g.jenis === 'kuas'
+                  /* Goresan bebas tidak punya jangkar yang berarti untuk
+                     ditarik — ia cuma bisa digeser utuh. Tandanya dibuat di
+                     goresannya sendiri (lihat cabang 'kuas'). */
+                  ? []
+                  : g.jenis === 'rayH' || g.jenis === 'garisH' || g.jenis === 'garisV'
                   /* Satu pegangan saja: garis harga cuma punya SATU titik
                      yang berarti — pangkalnya. Ujung kanannya ditentukan
                      tepi panel, bukan oleh orangnya, jadi pegangan di sana
                      akan menjanjikan tarikan yang tidak ada. */
                   ? [[x1, y1]]
-                  : g.jenis === 'garis'
+                  : g.jenis === 'garis' || g.jenis === 'sinar' || g.jenis === 'garisPanjang' || g.jenis === 'panah'
                   ? [[x1, y1], [x2, y2]]
+                  : g.jenis === 'channel'
+                    /* Dua ujung garis dasar, dan satu pegangan LEBAR di
+                       tengah garis sejajarnya. */
+                    ? [[x1, y1], [x2, y2],
+                       [(x1 + x2) / 2, ((Y(g.h1 + d3) ?? y1) + (Y(g.h2 + d3) ?? y2)) / 2]]
                   : g.jenis === 'posisi'
                     /* Posisi punya TIGA harga dan satu rentang waktu, bukan
                        dua sudut. Pegangan harga duduk di TENGAH garisnya
@@ -318,6 +413,203 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                     `SL ${hargaTeks(hSl)}  ${tanda(pS)}`, '248,113,113');
                   chip(kiri + 4, y1, rugi > 0 ? `RR 1:${(untung / rugi).toFixed(2)}` : 'RR —', '228,228,231');
                   chip(kanan - 4, y1, `Entry ${hargaTeks(g.h1)}`, '228,228,231', true);
+                }
+                continue;
+              }
+
+              /* Label bersalut yang TENGAHNYA di (x, y). */
+              const chipTengah = (x: number, y: number, teks: string, rgb: string) => {
+                const w = ctx.measureText(teks).width;
+                chip(x - (w + 14) / 2, y, teks, rgb);
+              };
+
+              /* ── SINAR & GARIS PANJANG ─────────────────────────────────
+                 Ujungnya ditentukan TEPI PANEL, bukan titik kedua: sinar
+                 menjulur dari titik 1 melewati titik 2, garis panjang ke
+                 dua arah. Dipotong ke persegi panel supaya kanvas tidak
+                 diminta menggambar ribuan piksel di luar layar. */
+              if (g.jenis === 'sinar' || g.jenis === 'garisPanjang') {
+                const r = potongGaris(x1, y1, x2, y2, mediaSize.width, mediaSize.height);
+                if (r) {
+                  const tA = g.jenis === 'sinar' ? Math.max(0, r.t0) : r.t0;
+                  if (r.t1 > tA) {
+                    const dx = x2 - x1, dy = y2 - y1;
+                    ctx.strokeStyle = BIRU;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(x1 + tA * dx, y1 + tA * dy);
+                    ctx.lineTo(x1 + r.t1 * dx, y1 + r.t1 * dy);
+                    ctx.stroke();
+                  }
+                }
+                ctx.fillStyle = BIRU;
+                for (const [ux, uy] of [[x1, y1], [x2, y2]]) {
+                  ctx.beginPath();
+                  ctx.arc(ux, uy, 2.2, 0, Math.PI * 2);
+                  ctx.fill();
+                }
+                continue;
+              }
+
+              /* GARIS HORIZONTAL — selebar panel, ke masa lalu juga. Beda
+                 dengan garis harga (rayH) yang mulai dari titik klik. Warna
+                 kuning yang sama: dua-duanya "level harga". Angkanya
+                 menumpang sumbu harga lewat price line di chart-lilin. */
+              if (g.jenis === 'garisH') {
+                ctx.strokeStyle = KUNING;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(0, y1); ctx.lineTo(mediaSize.width, y1);
+                ctx.stroke();
+                continue;
+              }
+
+              /* GARIS VERTIKAL — menandai satu saat. Tanggalnya ditulis di
+                 kaki panel hanya saat terpilih, alasan yang sama dengan
+                 angka alat posisi: chart berisi beberapa garis tegak yang
+                 masing-masing berlabel jadi pagar teks. */
+              if (g.jenis === 'garisV') {
+                ctx.strokeStyle = BIRU;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x1, 0); ctx.lineTo(x1, mediaSize.height);
+                ctx.stroke();
+                if (terpilih) chipTengah(x1, mediaSize.height - 14, waktuTeks(g.t1), '96,165,250');
+                continue;
+              }
+
+              /* CHANNEL SEJAJAR — garis dasar, garis sejajar sejauh `h3`
+                 harga, bidang tipis di antaranya, dan garis tengah putus-
+                 putus. Garis tengah bukan hiasan: harga yang kembali ke
+                 tengah channel adalah hal pertama yang dicari orang yang
+                 menggambarnya. */
+              if (g.jenis === 'channel') {
+                const ya = Y(g.h1 + d3OR(g)), yb = Y(g.h2 + d3OR(g));
+                if (ya == null || yb == null) continue;
+                ctx.fillStyle = 'rgba(96,165,250,.08)';
+                ctx.beginPath();
+                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x2, yb); ctx.lineTo(x1, ya);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = BIRU;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                ctx.moveTo(x1, ya); ctx.lineTo(x2, yb);
+                ctx.stroke();
+                ctx.save();
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(96,165,250,.55)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x1, (y1 + ya) / 2); ctx.lineTo(x2, (y2 + yb) / 2);
+                ctx.stroke();
+                ctx.restore();
+                continue;
+              }
+
+              /* PANAH — batangnya berhenti di pangkal mata panah supaya
+                 ujungnya tajam, tidak tumpul tertutup ujung garis. */
+              if (g.jenis === 'panah') {
+                const warna = 'rgba(56,189,248,.95)';
+                const sudut = Math.atan2(y2 - y1, x2 - x1);
+                const p = 10;
+                ctx.strokeStyle = warna;
+                ctx.fillStyle = warna;
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2 - Math.cos(sudut) * p * 0.8, y2 - Math.sin(sudut) * p * 0.8);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(x2 - p * Math.cos(sudut - 0.42), y2 - p * Math.sin(sudut - 0.42));
+                ctx.lineTo(x2 - p * Math.cos(sudut + 0.42), y2 - p * Math.sin(sudut + 0.42));
+                ctx.closePath();
+                ctx.fill();
+                continue;
+              }
+
+              /* KUAS — goresan bebas. Titik yang tidak punya koordinat
+                 (jauh di luar data) memutus goresan, bukan menyambungnya
+                 ke titik berikutnya lewat garis lurus yang tidak pernah
+                 digambar orangnya. */
+              if (g.jenis === 'kuas') {
+                const pts = g.titik && g.titik.length ? g.titik : [[g.t1, g.h1], [g.t2, g.h2]] as [number, number][];
+                const jalur = () => {
+                  ctx.beginPath();
+                  let mulai = true;
+                  for (const [t, h] of pts) {
+                    const x = this.X(t), y = Y(h);
+                    if (x == null || y == null) { mulai = true; continue; }
+                    if (mulai) { ctx.moveTo(x, y); mulai = false; } else ctx.lineTo(x, y);
+                  }
+                };
+                ctx.save();
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                if (terpilih) {
+                  jalur();
+                  ctx.strokeStyle = 'rgba(250,250,250,.35)';
+                  ctx.lineWidth = 6;
+                  ctx.stroke();
+                }
+                jalur();
+                ctx.strokeStyle = 'rgba(167,139,250,.95)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+                continue;
+              }
+
+              /* RENTANG HARGA & RENTANG WAKTU — dua bagian dari alat ukur
+                 lama, masing-masing berdiri sendiri seperti di TradingView:
+                 yang satu cuma menjawab "berapa jauh harganya", yang lain
+                 "berapa lama". Warna langit, supaya tidak tertukar dengan
+                 ukur lama yang hijau/merah. */
+              if (g.jenis === 'ukurHarga' || g.jenis === 'ukurWaktu') {
+                const rgb = '56,189,248';
+                const atas = Math.min(y1, y2), bawah = Math.max(y1, y2);
+                ctx.fillStyle = `rgba(${rgb},.10)`;
+                ctx.fillRect(kiri, atas, kanan - kiri, bawah - atas);
+                ctx.strokeStyle = `rgba(${rgb},.75)`;
+                ctx.fillStyle = `rgba(${rgb},.9)`;
+                ctx.lineWidth = 1;
+                const mata = (tx: number, ty: number, ux: number, uy: number) => {
+                  ctx.beginPath();
+                  ctx.moveTo(tx, ty);
+                  ctx.lineTo(tx - ux * 6 - uy * 3.5, ty - uy * 6 + ux * 3.5);
+                  ctx.lineTo(tx - ux * 6 + uy * 3.5, ty - uy * 6 - ux * 3.5);
+                  ctx.closePath();
+                  ctx.fill();
+                };
+                if (g.jenis === 'ukurHarga') {
+                  const xt = (kiri + kanan) / 2;
+                  ctx.beginPath();
+                  ctx.moveTo(kiri, y1); ctx.lineTo(kanan, y1);
+                  ctx.moveTo(kiri, y2); ctx.lineTo(kanan, y2);
+                  ctx.moveTo(xt, y1); ctx.lineTo(xt, y2);
+                  ctx.stroke();
+                  if (y2 !== y1) mata(xt, y2, 0, y2 > y1 ? 1 : -1);
+                  const selisih = g.h2 - g.h1;
+                  const pct = g.h1 ? (selisih / g.h1) * 100 : 0;
+                  const tanda = selisih >= 0 ? '+' : '−';
+                  /* Di sisi ujung tarikan; dibalik kalau tidak muat di
+                     panel — label yang jatuh di luar kanvas tidak tergambar
+                     sama sekali. */
+                  const lyH = y2 < y1 ? atas - 13 : bawah + 13;
+                  chipTengah(xt, lyH < 10 ? bawah + 13 : lyH > mediaSize.height - 10 ? atas - 13 : lyH,
+                    `${tanda}${hargaTeks(Math.abs(selisih))}  (${tanda}${Math.abs(pct).toFixed(2)}%)`, rgb);
+                } else {
+                  const yt = (atas + bawah) / 2;
+                  ctx.beginPath();
+                  ctx.moveTo(x1, atas); ctx.lineTo(x1, bawah);
+                  ctx.moveTo(x2, atas); ctx.lineTo(x2, bawah);
+                  ctx.moveTo(x1, yt); ctx.lineTo(x2, yt);
+                  ctx.stroke();
+                  if (x2 !== x1) mata(x2, yt, x2 > x1 ? 1 : -1, 0);
+                  const bar = this.meta.tfMs ? Math.abs(Math.round((g.t2 - g.t1) / this.meta.tfMs)) : 0;
+                  chipTengah((kiri + kanan) / 2, bawah + 13 > mediaSize.height - 10 ? atas - 13 : bawah + 13, `${bar} bar  ·  ${durasiTeks(Math.abs(g.t2 - g.t1))}`, rgb);
                 }
                 continue;
               }
