@@ -17,6 +17,7 @@ import { POLOS, UTAMA, ID_PANEL, TF_PANEL, kirimBus, dengarBus, nyalakanMulti, r
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { BilahGambar, useSetelanBilah } from '@/components/bilah-gambar';
+import { BukuOrderHl } from '@/components/buku-order-hl';
 import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, tickSimbol, keTick, type MetodeTp } from '@/lib/order-nyata';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pine';
@@ -1125,6 +1126,18 @@ export default function ChartBacktest() {
 
   /* Tombol hapus di bilah: yang terpilih dulu; kalau tidak ada yang
      terpilih, semuanya — dengan konfirmasi, dan tetap bisa diurung. */
+  /* Membuang satu gambar menurut id — dipakai teks yang isinya dikosongkan
+     saat disunting. Bisa diurung, sama seperti hapus lainnya. */
+  function buangGambar(id: string) {
+    catatRiwayat();
+    setGambarAlat((d) => {
+      const b = d.filter((g) => g.id !== id);
+      simpanAlat(simbol, b);
+      return b;
+    });
+    setGambarPilih((p) => (p === id ? null : p));
+  }
+
   function hapusGambar() {
     if (gambarPilih) {
       catatRiwayat();
@@ -5184,7 +5197,11 @@ ${pnlSunting !== null
         )}
 
         {/* `relative`: jangkar hamparan kaki chart yang ada DI DALAMNYA. */}
-        <div className="relative border-t border-zinc-800/80 px-2 pb-2">
+        {/* Bantalan kiri dilepas selama bilah gambar tampil: kolomnya
+            menempel ke tepi kartu, jadi ikon-ikonnya berada di tengah antara
+            tepi kartu dan chart. Dengan bantalan 8 px, celah kiri ikon 17 px
+            sementara kanannya 10 px — diukur 29 Sep 2026. */}
+        <div className={cn('relative border-t border-zinc-800/80 px-2 pb-2', bilah.tampil && 'pl-0')}>
           {/* relative + overflow-hidden: rumah semua hamparan chart — legend,
               alat gambar, dock Pine, dan watchlist yang meluncur dari kanan.
               Tanpa overflow-hidden, panel yang sedang tersembunyi
@@ -5378,6 +5395,7 @@ ${pnlSunting !== null
                           onLebarKiri={setSisaKiriDalam}
                           kursor={bilah.kursor} magnet={bilah.magnet}
                           kunciGambar={bilah.kunci} sembunyiGambar={bilah.sembunyi}
+                          onLepasAlat={() => setAlat(null)} onBuangGambar={buangGambar}
                           panelKiri={dexBuka ? (
                             <div className="flex h-full flex-col">
                               <div className="flex items-center gap-2 border-b border-zinc-800 px-2.5 py-1.5">
@@ -6362,6 +6380,25 @@ ${pnlSunting !== null
                     onLebar={setLebarPine} rapat={POLOS ? -8 : -20}
                     lilin={lilinGabung} simbol={simbol} tf={tf} hingga={replayIdx ?? undefined}
                     aturHasil={setPine} onInfo={setPineInfo} onKendali={setKendaliPine} />
+          {/* ── ORDER BOOK HYPERLIQUID ──────────────────────────────────
+              Diminta pemilik 29 Sep 2026, di kiri watchlist, HANYA saat
+              chart ini pasar Hyperliquid — order book Binance butuh jalur
+              proxy lain (ISP memblokir Binance), dan order book yang tidak
+              sesuai dengan pasar chart-nya menyesatkan. Tidak di panel
+              multi-chart: lebarnya tidak cukup untuk chart DAN buku.
+
+              Klik harga = mengisi harga entry tiket yang sedang terbuka,
+              lewat jalur yang sama dengan menyeret garis entry. */}
+          {!POLOS && bacaPasar(simbol) === 'hyperliquid' && (
+            /* Harus ada TIKET BUY/SELL (draf), bukan cuma panel order yang
+               terbuka: tanpa tiket, entry yang diisi tidak punya tempat. */
+            <BukuOrderHl simbol={simbol} tinggi={tinggiChart} bisaIsi={!!aksi && !!draf}
+              onPilihHarga={(px) => {
+                if (!aksi || !draf) return;
+                entryDigeser.current = true;
+                setRencana((r) => ({ ...r, entry: px }));
+              }} />
+          )}
           {/* Watchlist beserta garis pembatasnya ditiadakan di panel BIASA:
               di lebar seperempat layar ia memakan ruang chart yang justru
               jadi alasan panel itu ada. Tetap hidup di panel UTAMA — dari

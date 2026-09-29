@@ -69,6 +69,11 @@ const IKON: Record<string, ReactNode> = {
   ukurHarga: <><path d="M8 4.5h12M8 23.5h12M14 5.5v17" /><path d="M11 8.5l3-3 3 3M11 19.5l3 3 3-3" /></>,
   ukurWaktu: <><path d="M4.5 8v12M23.5 8v12M5.5 14h17" /><path d="M8.5 11l-3 3 3 3M19.5 11l3 3-3 3" /></>,
   ukur: <><rect x={5} y={6.5} width={18} height={15} rx={1} opacity={0.45} /><path d="M14 9v10M8 14h12" /><path d="M11.5 11.5 14 9l2.5 2.5M17.5 11.5 20 14l-2.5 2.5" /></>,
+  fibExt: <><path d="M5 5h18M5 9.5h18M5 14h18" opacity={0.85} /><path d="M5 24l5-7 4 4 8-8.5" />{titikUjung(5, 24)}{titikUjung(10, 17)}{titikUjung(14, 21)}</>,
+  teks: <path d="M7 7h14M14 7v15M11 22h6" />,
+  labelHarga: <><path d="M5.5 14 10.5 8H23v12H10.5z" /><circle cx={11} cy={14} r={1.4} fill="currentColor" stroke="none" /></>,
+  zoom: <><circle cx={12} cy={12} r={6.5} /><path d="M17 17l6 6M12 9v6M9 12h6" /></>,
+  zoomKeluar: <><circle cx={12} cy={12} r={6.5} /><path d="M17 17l6 6M9 12h6" /></>,
 };
 
 /* ── KELOMPOK ALAT ────────────────────────────────────────────────────── */
@@ -76,7 +81,7 @@ type Butir =
   | { macam: 'kursor'; nilai: Kursor; nama: string; ikon: string }
   | { macam: 'alat'; nilai: AlatPegang; nama: string; ikon: string; pintas?: string };
 
-interface Grup { id: string; judul: string; butir: Butir[] }
+interface Grup { id: string; judul: string; butir: Butir[]; pisahSebelum?: boolean }
 
 const GRUP: Grup[] = [
   { id: 'kursor', judul: 'Kursor', butir: [
@@ -95,11 +100,16 @@ const GRUP: Grup[] = [
   ] },
   { id: 'fib', judul: 'Fibonacci', butir: [
     { macam: 'alat', nilai: 'fib', nama: 'Fib retracement', ikon: 'fib', pintas: 'Alt+F' },
+    { macam: 'alat', nilai: 'fibExt', nama: 'Fib extension (3 titik)', ikon: 'fibExt' },
   ] },
   { id: 'bentuk', judul: 'Bentuk', butir: [
     { macam: 'alat', nilai: 'kuas', nama: 'Kuas', ikon: 'kuas' },
     { macam: 'alat', nilai: 'kotak', nama: 'Kotak / zona SNR', ikon: 'kotak', pintas: 'Alt+Shift+R' },
     { macam: 'alat', nilai: 'panah', nama: 'Panah', ikon: 'panah' },
+  ] },
+  { id: 'teks', judul: 'Teks', butir: [
+    { macam: 'alat', nilai: 'teks', nama: 'Teks', ikon: 'teks' },
+    { macam: 'alat', nilai: 'labelHarga', nama: 'Label harga', ikon: 'labelHarga' },
   ] },
   { id: 'posisi', judul: 'Posisi & ukur', butir: [
     { macam: 'alat', nilai: 'posisiBeli', nama: 'Posisi long', ikon: 'posisiBeli' },
@@ -107,6 +117,11 @@ const GRUP: Grup[] = [
     { macam: 'alat', nilai: 'ukurHarga', nama: 'Rentang harga', ikon: 'ukurHarga' },
     { macam: 'alat', nilai: 'ukurWaktu', nama: 'Rentang waktu', ikon: 'ukurWaktu' },
     { macam: 'alat', nilai: 'ukur', nama: 'Rentang harga & waktu', ikon: 'ukur' },
+  ] },
+  /* Zoom bukan alat gambar — dipisah garis, seperti di TradingView. */
+  { id: 'zoom', judul: 'Zoom', pisahSebelum: true, butir: [
+    { macam: 'alat', nilai: 'zoom', nama: 'Perbesar area — tarik rentang waktunya', ikon: 'zoom' },
+    { macam: 'alat', nilai: 'zoomKeluar', nama: 'Kembalikan zoom', ikon: 'zoomKeluar' },
   ] },
 ];
 
@@ -153,9 +168,25 @@ function bacaBuka(): boolean {
   return !POLOS && typeof window !== 'undefined' && window.innerWidth >= 768;
 }
 
+/* ── LIPAT HANYA DI LAYAR SEMPIT ─────────────────────────────────────────
+   Diminta pemilik 29 Sep 2026: tombol lipat di bilah tidak perlu. Di layar
+   lebar kolomnya selalu tampil. Di bawah 768 px (ponsel, dan panel multi-
+   chart yang sempit — iframe punya lebar jendelanya sendiri) tombolnya
+   tetap ada, karena di sana 40 px adalah potongan besar dari lebar chart. */
+const BATAS_SEMPIT = 768;
+function cekSempit(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth < BATAS_SEMPIT;
+}
+
 export function useSetelanBilah() {
   const [s, setS] = useState<Setelan>(bacaSetelan);
   const [buka, setBukaState] = useState<boolean>(bacaBuka);
+  const [sempit, setSempit] = useState<boolean>(cekSempit);
+  useEffect(() => {
+    const ukur = () => setSempit(cekSempit());
+    window.addEventListener('resize', ukur);
+    return () => window.removeEventListener('resize', ukur);
+  }, []);
   const ubah = useCallback((b: Partial<Setelan>) => {
     setS((l) => {
       const n = { ...l, ...b };
@@ -167,7 +198,10 @@ export function useSetelanBilah() {
     setBukaState(v);
     try { localStorage.setItem(KUNCI_BUKA, v ? '1' : '0'); } catch { /* privat */ }
   }, []);
-  return { ...s, buka, ubah, setBuka };
+  /** Kolomnya benar-benar tampil: selalu di layar lebar, di layar sempit
+   *  menurut pilihan orangnya. */
+  const tampil = !sempit || buka;
+  return { ...s, buka, sempit, tampil, ubah, setBuka };
 }
 export type SetelanBilah = ReturnType<typeof useSetelanBilah>;
 
@@ -184,7 +218,7 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
    *  atas daftar panel itu. */
   kiriTerlipat?: number;
 }) {
-  const { kursor, magnet, magnetTerakhir, tetap, kunci, sembunyi, pilihan, ubah, buka, setBuka } = setelan;
+  const { kursor, magnet, magnetTerakhir, tetap, kunci, sembunyi, pilihan, ubah, sempit, tampil, setBuka } = setelan;
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -277,7 +311,7 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
   }, [alat, pegang, pilihan, ubah]);
 
   /* ── TERLIPAT ───────────────────────────────────────────────────────── */
-  if (!buka) {
+  if (!tampil) {
     return (
       <button onClick={() => setBuka(true)} title="Tampilkan bilah alat gambar"
         style={{ left: kiriTerlipat }}
@@ -301,17 +335,18 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
         const judul = b.macam === 'alat' && b.pintas ? `${b.nama} · ${b.pintas}` : b.nama;
         return (
           <div key={g.id} className="group relative">
+            {g.pisahSebelum && <div className="mx-auto mb-1 mt-0.5 h-px w-6 bg-zinc-800" />}
             <button onClick={() => klikGrup(g)} title={judul} aria-pressed={on}
               className={cn(tombol, on ? nyala : biasa)}>
               <Ik>{IKON[b.ikon]}</Ik>
             </button>
             {/* Panah kecil pembuka menu — hanya untuk kelompok yang punya
-                lebih dari satu alat. Segitiga di sudut selalu terlihat
-                sebagai tanda ada pilihan lain; bilah sempit di tepi kanan
-                yang muncul saat disorot adalah tempat mengkliknya. */}
+                lebih dari satu alat, dan hanya terlihat saat disorot, seperti
+                di Hyperliquid/TradingView. Segitiga sudut yang dulu selalu
+                tampil dibuang 29 Sep 2026: membuat ikonnya terlihat tidak
+                di tengah. */}
             {g.butir.length > 1 && (
               <>
-                <span aria-hidden className="pointer-events-none absolute bottom-[3px] right-[3px] size-0 border-b-[4px] border-l-[4px] border-b-zinc-600 border-l-transparent" />
                 <button data-bilah-panah onClick={(e) => bukaMenu(g.id, e.currentTarget)}
                   title={`Pilihan ${g.judul.toLowerCase()}`}
                   className={cn('absolute -right-1 top-0 flex h-8 w-2.5 cursor-pointer items-center justify-center rounded-sm text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-zinc-100 group-hover:opacity-100',
@@ -365,11 +400,15 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
         <Trash2 className="size-[17px]" strokeWidth={1.6} />
       </button>
 
-      <div className="min-h-2 flex-1" />
-      <button onClick={() => setBuka(false)} title="Sembunyikan bilah alat gambar"
-        className={cn(tombol, 'size-7 text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300')}>
-        <ChevronsLeft className="size-3.5" />
-      </button>
+      {sempit && (
+        <>
+          <div className="min-h-2 flex-1" />
+          <button onClick={() => setBuka(false)} title="Sembunyikan bilah alat gambar"
+            className={cn(tombol, 'size-7 text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300')}>
+            <ChevronsLeft className="size-3.5" />
+          </button>
+        </>
+      )}
 
       {/* ── MENU SAMPING ─────────────────────────────────────────────────
           Lewat portal ke <body>: wadah chart ber-overflow-hidden, dan menu

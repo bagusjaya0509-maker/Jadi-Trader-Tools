@@ -37,7 +37,11 @@ import type {
    digambar persis seperti sebelumnya. */
 export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis' | 'posisi' | 'rayH'
   | 'sinar' | 'garisPanjang' | 'garisH' | 'garisV' | 'channel' | 'panah' | 'kuas'
-  | 'ukurHarga' | 'ukurWaktu';
+  | 'ukurHarga' | 'ukurWaktu'
+  /* Tahap 2, 29 Sep 2026: fib extension (tiga titik), teks, label harga.
+     `zoomArea` BUKAN gambar — cuma rupa kotak pratinjau alat zoom; ia tidak
+     pernah disimpan. */
+  | 'fibExt' | 'teks' | 'labelHarga' | 'zoomArea';
 
 /** Alat yang bisa DIPEGANG di bilah.
 
@@ -45,7 +49,10 @@ export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis' | 'posisi' | 'rayH'
     menghasilkan gambar berjenis 'posisi' yang sama. Yang membedakan cuma
     `arah`-nya, jadi mereka bukan jenis gambar tersendiri: satu jalur
     penggambaran, satu jalur uji-kena, satu jalur seretan. */
-export type AlatPegang = Exclude<JenisAlat, 'posisi'> | 'posisiBeli' | 'posisiJual';
+export type AlatPegang = Exclude<JenisAlat, 'posisi' | 'zoomArea'> | 'posisiBeli' | 'posisiJual'
+  /* Dua alat yang tidak menghasilkan gambar: perbesar area yang ditarik,
+     dan kembali ke zoom sebelumnya. */
+  | 'zoom' | 'zoomKeluar';
 
 export interface GambarAlat {
   id: string;
@@ -72,6 +79,10 @@ export interface GambarAlat {
       t2/h2 tetap diisi titik pertama & terakhir supaya semua jalur yang
       memeriksa kedua ujung tetap bekerja tanpa cabang khusus. */
   titik?: [number, number][];
+  /** Waktu titik KETIGA — hanya 'fibExt' (titik C; harganya di `h3`). */
+  t3?: number;
+  /** Isi tulisan — hanya 'teks'. */
+  teks?: string;
 }
 
 interface MetaAlat { tAkhir: number; tfMs: number; n: number }
@@ -83,6 +94,26 @@ interface TargetKanvas { useMediaCoordinateSpace(f: (ruang: RuangMedia) => void)
 const LEVEL_FIB = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
 const BIRU = 'rgba(96,165,250,.95)';
+/** Level fib extension (trend-based) — dihitung dari titik C sejauh
+ *  kelipatan jarak A→B. */
+const LEVEL_FIB_EXT = [0, 0.382, 0.618, 1, 1.272, 1.618, 2, 2.618];
+
+/* ── UKURAN KOTAK TEKS ──────────────────────────────────────────────────
+   Satu pengukur untuk penggambar DAN uji-kena di chart-lilin: kotak yang
+   digambar dan kotak yang bisa diklik harus kotak yang sama persis. Kanvas
+   pengukurnya dibuat sekali. */
+export const HURUF_TEKS = "12.5px 'IBM Plex Sans', sans-serif";
+let pengukur: CanvasRenderingContext2D | null = null;
+export function ukurTeks(teks: string): { w: number; h: number; baris: string[] } {
+  const baris = (teks || ' ').split('\n');
+  if (!pengukur && typeof document !== 'undefined') pengukur = document.createElement('canvas').getContext('2d');
+  let w = 0;
+  if (pengukur) {
+    pengukur.font = HURUF_TEKS;
+    for (const b of baris) w = Math.max(w, pengukur.measureText(b).width);
+  } else w = Math.max(...baris.map((b) => b.length)) * 7;
+  return { w: Math.ceil(w) + 14, h: baris.length * 16 + 8, baris };
+}
 const KUNING = 'rgba(250,204,21,.95)';
 
 /** Potongan garis TAK BERUJUNG melalui (x1,y1)-(x2,y2) dengan persegi
@@ -279,7 +310,7 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                      ditarik — ia cuma bisa digeser utuh. Tandanya dibuat di
                      goresannya sendiri (lihat cabang 'kuas'). */
                   ? []
-                  : g.jenis === 'rayH' || g.jenis === 'garisH' || g.jenis === 'garisV'
+                  : g.jenis === 'rayH' || g.jenis === 'garisH' || g.jenis === 'garisV' || g.jenis === 'labelHarga'
                   /* Satu pegangan saja: garis harga cuma punya SATU titik
                      yang berarti — pangkalnya. Ujung kanannya ditentukan
                      tepi panel, bukan oleh orangnya, jadi pegangan di sana
@@ -287,6 +318,14 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                   ? [[x1, y1]]
                   : g.jenis === 'garis' || g.jenis === 'sinar' || g.jenis === 'garisPanjang' || g.jenis === 'panah'
                   ? [[x1, y1], [x2, y2]]
+                  : g.jenis === 'fibExt'
+                    ? ([[x1, y1], [x2, y2]] as [number, number][]).concat(
+                        g.t3 != null && g.h3 != null && this.X(g.t3) != null && Y(g.h3) != null
+                          ? [[this.X(g.t3) as number, Y(g.h3) as number]] : [])
+                  : g.jenis === 'teks'
+                    /* Teks tidak diberi pegangan: ia digeser utuh, dan kotaknya
+                       sendiri yang menandai terpilih (lihat cabang 'teks'). */
+                    ? []
                   : g.jenis === 'channel'
                     /* Dua ujung garis dasar, dan satu pegangan LEBAR di
                        tengah garis sejajarnya. */
@@ -422,6 +461,104 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                 const w = ctx.measureText(teks).width;
                 chip(x - (w + 14) / 2, y, teks, rgb);
               };
+
+              /* ── FIB EXTENSION (trend-based) ───────────────────────────
+                 Tiga titik: A→B adalah gelombang yang diukur, C tempat
+                 koreksinya berakhir. Level = C + (B − A) × rasio. Garis
+                 putus-putus A→B→C selalu digambar — tanpa itu, dua level
+                 yang mirip dari dua tarikan berbeda tidak bisa dibedakan
+                 asal-usulnya. Selama C belum ditaruh, cuma A→B yang tampak. */
+              if (g.jenis === 'fibExt') {
+                const xC = g.t3 != null ? this.X(g.t3) : null;
+                const yC = g.h3 != null ? Y(g.h3) : null;
+                ctx.save();
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(212,212,216,.55)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                if (xC != null && yC != null) ctx.lineTo(xC, yC);
+                ctx.stroke();
+                ctx.restore();
+                if (xC == null || yC == null || g.h3 == null) continue;
+                const panjang = Math.max(80, Math.abs(x2 - x1));
+                for (const lv of LEVEL_FIB_EXT) {
+                  const harga = g.h3 + (g.h2 - g.h1) * lv;
+                  const y = Y(harga);
+                  if (y == null) continue;
+                  const emas = lv === 1.618, kuat = lv === 0 || lv === 1;
+                  ctx.strokeStyle = emas ? 'rgba(245,158,11,.75)' : `rgba(212,212,216,${kuat ? '.55' : '.3'})`;
+                  ctx.lineWidth = 1;
+                  ctx.beginPath();
+                  ctx.moveTo(xC, y); ctx.lineTo(xC + panjang, y);
+                  ctx.stroke();
+                  ctx.fillStyle = emas ? 'rgba(245,158,11,.9)' : 'rgba(212,212,216,.7)';
+                  ctx.fillText(`${lv}  ${hargaTeks(harga)}`, xC + 4, y - 7);
+                }
+                continue;
+              }
+
+              /* ── TEKS ──────────────────────────────────────────────────
+                 Titik yang diklik adalah pojok KIRI-ATAS kotaknya: tempat
+                 tulisannya mulai, sama seperti mengetik di mana pun. Latar
+                 gelap setengah tembus supaya terbaca di atas lilin. */
+              if (g.jenis === 'teks') {
+                const u = ukurTeks(g.teks ?? '');
+                ctx.save();
+                ctx.font = HURUF_TEKS;
+                ctx.fillStyle = 'rgba(9,9,11,.72)';
+                ctx.beginPath();
+                ctx.roundRect(x1, y1, u.w, u.h, 4);
+                ctx.fill();
+                if (terpilih) {
+                  ctx.strokeStyle = 'rgba(250,250,250,.7)';
+                  ctx.lineWidth = 1;
+                  ctx.setLineDash([3, 3]);
+                  ctx.stroke();
+                }
+                ctx.fillStyle = 'rgba(244,244,245,.96)';
+                ctx.textBaseline = 'top';
+                u.baris.forEach((b, i) => ctx.fillText(b, x1 + 7, y1 + 5 + i * 16));
+                ctx.restore();
+                continue;
+              }
+
+              /* ── LABEL HARGA ───────────────────────────────────────────
+                 Titik di harga yang diklik, garis pendek ke kanan-atas, dan
+                 kotak berisi angkanya — menandai SATU harga di SATU saat,
+                 beda dengan garis harga yang menjulur. */
+              if (g.jenis === 'labelHarga') {
+                const teks = hargaTeks(g.h1);
+                const w = ctx.measureText(teks).width + 14;
+                ctx.strokeStyle = 'rgba(250,204,21,.9)';
+                ctx.fillStyle = 'rgba(250,204,21,.95)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(x1, y1, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(x1, y1); ctx.lineTo(x1 + 10, y1 - 12);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.roundRect(x1 + 10, y1 - 29, w, 17, 4);
+                ctx.fill();
+                ctx.fillStyle = '#09090b';
+                ctx.fillText(teks, x1 + 17, y1 - 20.5);
+                continue;
+              }
+
+              /* Pratinjau alat ZOOM — kotak putus-putus, tidak pernah disimpan. */
+              if (g.jenis === 'zoomArea') {
+                ctx.save();
+                ctx.fillStyle = 'rgba(148,163,184,.10)';
+                ctx.fillRect(kiri, 0, kanan - kiri, mediaSize.height);
+                ctx.setLineDash([4, 3]);
+                ctx.strokeStyle = 'rgba(148,163,184,.7)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(kiri + 0.5, 0.5, kanan - kiri - 1, mediaSize.height - 1);
+                ctx.restore();
+                continue;
+              }
 
               /* ── SINAR & GARIS PANJANG ─────────────────────────────────
                  Ujungnya ditentukan TEPI PANEL, bukan titik kedua: sinar

@@ -10,7 +10,7 @@ import { cn, harga as fHarga } from '@/lib/utils';
 import type { TradeUji } from '@/lib/backtest';
 import type { SegmenPine, PenandaPine, KotakPine, IsianPine } from '@/lib/pine-bar';
 import { PenggambarIsi } from '@/lib/plugin-isi';
-import { PenggambarAlat, jarakKeGaris, type GambarAlat, type AlatPegang } from '@/lib/plugin-alat';
+import { PenggambarAlat, jarakKeGaris, ukurTeks, type GambarAlat, type AlatPegang } from '@/lib/plugin-alat';
 import { PenggambarJenuh } from '@/lib/plugin-jenuh';
 import { useTema, temaSekarang, WARNA_CHART } from '@/lib/tema';
 
@@ -280,7 +280,7 @@ export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, redupDari, pusatkanBar, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, garisKlik, onKlikGarisOrder, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
-  kursor = 'silang', magnet = 'mati', kunciGambar = false, sembunyiGambar = false,
+  kursor = 'silang', magnet = 'mati', kunciGambar = false, sembunyiGambar = false, onLepasAlat, onBuangGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, muatPenuh, bagikanFoto, tandaAir, tampilan, pitaSmi,
   jiplak, onUbahJiplak, onLepasJiplak, panelKiri, onLebarKiri,
   hamparanBarTertua, onUjungKiri, refKoordinat,
@@ -425,6 +425,10 @@ export function ChartLilin({
   kunciGambar?: boolean;
   /** Gambar disembunyikan — tidak digambar, tidak bisa dipilih. */
   sembunyiGambar?: boolean;
+  /** Alat yang tidak menghasilkan gambar (zoom) melepaskan dirinya lewat ini. */
+  onLepasAlat?: () => void;
+  /** Membuang satu gambar — dipakai teks yang dikosongkan saat disunting. */
+  onBuangGambar?: (id: string) => void;
   /** Gambar tangan yang sudah jadi — ukur, fib, kotak. */
   gambarAlat?: GambarAlat[];
   /** Gambar yang sedang terpilih (bingkai + pegangan). */
@@ -433,7 +437,7 @@ export function ChartLilin({
   onPilihGambar?: (id: string | null) => void;
   /** Gambar terpilih digeser utuh, atau salah satu ujungnya ditarik.
    *  Tanpa handler ini gambar tetap beku setelah tertempel. */
-  onUbahGambar?: (id: string, ubah: Partial<Pick<GambarAlat, 't1' | 'h1' | 't2' | 'h2' | 'h3' | 'titik'>>) => void;
+  onUbahGambar?: (id: string, ubah: Partial<Pick<GambarAlat, 't1' | 'h1' | 't2' | 'h2' | 'h3' | 'titik' | 't3' | 'teks'>>) => void;
   /** Posisi MT5 terbuka — price line entry/SL/TP + PnL + seret SL/TP. */
   /** Chart acuan yang dipasang BERDAMPINGAN, bukan ditumpuk.
    *
@@ -1637,6 +1641,32 @@ export function ChartLilin({
     }
     return out;
   };
+  /* Titik & wilayah fib extension dalam piksel — satu fungsi untuk uji-kena
+     dan seret, alasan yang sama dengan kuas. */
+  const pikselFibExt = (g: GambarAlat) => {
+    const c = chart.current, s = seri.current;
+    if (!c || !s || g.t3 == null || g.h3 == null) return null;
+    const times = acuan.current.lilin.times;
+    const X = (t: number): number | null => {
+      const x = c.timeScale().timeToCoordinate(Math.floor(t / 1000) as Time);
+      if (x != null) return x;
+      if (times.length < 2) return null;
+      return c.timeScale().logicalToCoordinate((times.length - 1 + (t - times[times.length - 1]) / tfRef.current) as Logical);
+    };
+    const xa = X(g.t1), xb = X(g.t2), xc = X(g.t3);
+    const ya = s.priceToCoordinate(g.h1), yb = s.priceToCoordinate(g.h2), yc = s.priceToCoordinate(g.h3);
+    if (xa == null || xb == null || xc == null || ya == null || yb == null || yc == null) return null;
+    const ujung = s.priceToCoordinate(g.h3 + (g.h2 - g.h1) * 2.618);
+    const ys = ujung == null ? [yc] : [yc, ujung];
+    return { xa, ya, xb, yb, xc, yc, xKanan: xc + Math.max(80, Math.abs(xb - xa)),
+             yAtas: Math.min(...ys), yBawah: Math.max(...ys) };
+  };
+  const kenaFibExt = (g: GambarAlat, px: number, py: number): boolean => {
+    const k = pikselFibExt(g);
+    if (!k) return false;
+    return jarakKeGaris(px, py, k.xa, k.ya, k.xb, k.yb) <= 7 || jarakKeGaris(px, py, k.xb, k.yb, k.xc, k.yc) <= 7
+      || (px >= k.xc - 4 && px <= k.xKanan + 4 && py >= k.yAtas - 4 && py <= k.yBawah + 4);
+  };
   const kenaKuas = (g: GambarAlat, px: number, py: number): boolean => {
     const pts = pikselKuas(g);
     if (pts.length === 1) return Math.hypot(px - pts[0][0], py - pts[0][1]) <= 7;
@@ -1703,6 +1733,16 @@ export function ChartLilin({
           continue;
         }
         if (g.jenis === 'kuas') { if (kenaKuas(g, px, py)) { kena = g.id; break; } continue; }
+        if (g.jenis === 'fibExt') { if (kenaFibExt(g, px, py)) { kena = g.id; break; } continue; }
+        if (g.jenis === 'teks') {
+          const u = ukurTeks(g.teks ?? '');
+          if (px >= x1 && px <= x1 + u.w && py >= y1 && py <= y1 + u.h) { kena = g.id; break; }
+          continue;
+        }
+        if (g.jenis === 'labelHarga') {
+          if (px >= x1 - 6 && px <= x1 + 100 && py >= y1 - 31 && py <= y1 + 6) { kena = g.id; break; }
+          continue;
+        }
         if (g.jenis === 'garis') {
           /* Garis tren diagonal: kotak pembatasnya luas — yang diuji JARAK
              ke ruasnya, supaya hanya klik di dekat garisnya yang memilih,
@@ -1743,7 +1783,7 @@ export function ChartLilin({
      ikut bergeser di tengah seretan (harga baru masuk) tidak menyeret
      gambarnya ikut pindah. */
   const seretGambar = useRef<
-    { id: string; mode: 'geser' | 'ujung1' | 'ujung2' | 'tp' | 'sl' | 'lebar'; awal: GambarAlat; t: number; h: number } | null
+    { id: string; mode: 'geser' | 'ujung1' | 'ujung2' | 'ujung3' | 'tp' | 'sl' | 'lebar'; awal: GambarAlat; t: number; h: number } | null
   >(null);
 
   useEffect(() => {
@@ -1805,7 +1845,7 @@ export function ChartLilin({
       /* Pegangan menang atas badan: ujung yang berada di dalam badan kotak
          tetap harus bisa ditarik sendiri. */
       const dekat = (hx: number, hy: number) => Math.hypot(p.x - hx, p.y - hy) <= 9;
-      let mode: 'geser' | 'ujung1' | 'ujung2' | 'tp' | 'sl' | 'lebar' | null = null;
+      let mode: 'geser' | 'ujung1' | 'ujung2' | 'ujung3' | 'tp' | 'sl' | 'lebar' | null = null;
       if (g.jenis === 'posisi') {
         /* Pegangan alat posisi TIDAK di sudut kotak. Menarik sudut akan
            menggeser waktu dan harga sekaligus, dan menggeser TP tanpa
@@ -1827,6 +1867,20 @@ export function ChartLilin({
       /* Kuas cuma bisa digeser utuh; garis selebar/setinggi panel digeser
          dari titik mana pun di sepanjang garisnya. */
       else if (g.jenis === 'kuas') { if (kenaKuas(g, p.x, p.y)) mode = 'geser'; }
+      else if (g.jenis === 'fibExt') {
+        const kf = pikselFibExt(g);
+        if (dekat(k.x1, k.y1)) mode = 'ujung1';
+        else if (dekat(k.x2, k.y2)) mode = 'ujung2';
+        else if (kf && dekat(kf.xc, kf.yc)) mode = 'ujung3';
+        else if (kenaFibExt(g, p.x, p.y)) mode = 'geser';
+      }
+      else if (g.jenis === 'teks') {
+        const u = ukurTeks(g.teks ?? '');
+        if (p.x >= k.x1 && p.x <= k.x1 + u.w && p.y >= k.y1 && p.y <= k.y1 + u.h) mode = 'geser';
+      }
+      else if (g.jenis === 'labelHarga') {
+        if (p.x >= k.x1 - 6 && p.x <= k.x1 + 100 && p.y >= k.y1 - 31 && p.y <= k.y1 + 6) mode = 'geser';
+      }
       else if (g.jenis === 'garisH') { if (Math.abs(p.y - k.y1) <= 7) mode = 'geser'; }
       else if (g.jenis === 'garisV') { if (Math.abs(p.x - k.x1) <= 7) mode = 'geser'; }
       /* Pegangan LEBAR channel di tengah garis sejajarnya. Diuji sebelum
@@ -1905,6 +1959,11 @@ export function ChartLilin({
         onUbahGambar(sg.id, { h3: (a.h3 ?? 0) + (p.h - sg.h) });
         return;
       }
+      if (sg.mode === 'ujung3') {
+        const m3 = tempelMagnet(p.t, p.h, p.y);
+        onUbahGambar(sg.id, { t3: m3.t, h3: m3.h });
+        return;
+      }
       if (sg.mode === 'geser') {
         const dt = p.t - sg.t, dh = p.h - sg.h;
         /* Kuas membawa seluruh titik goresannya, bukan cuma dua ujung. */
@@ -1915,7 +1974,12 @@ export function ChartLilin({
           });
           return;
         }
-        onUbahGambar(sg.id, { t1: a.t1 + dt, h1: a.h1 + dh, t2: a.t2 + dt, h2: a.h2 + dh });
+        onUbahGambar(sg.id, {
+          t1: a.t1 + dt, h1: a.h1 + dh, t2: a.t2 + dt, h2: a.h2 + dh,
+          /* Fib extension membawa titik C-nya. BUKAN channel: di sana h3
+             selisih, dan menggesernya akan mengubah lebar channel. */
+          ...(a.jenis === 'fibExt' && a.t3 != null && a.h3 != null ? { t3: a.t3 + dt, h3: a.h3 + dh } : {}),
+        });
         return;
       }
       /* Ujung yang ditarik ikut MAGNET — sama seperti saat menggambar. */
@@ -1923,7 +1987,8 @@ export function ChartLilin({
       if (sg.mode === 'ujung1') {
         /* Gambar satu titik (garis harga, horizontal, vertikal): kedua
            ujungnya selalu sama, jadi ujung kedua ikut. */
-        const satuTitik = a.jenis === 'rayH' || a.jenis === 'garisH' || a.jenis === 'garisV';
+        const satuTitik = a.jenis === 'rayH' || a.jenis === 'garisH' || a.jenis === 'garisV'
+          || a.jenis === 'labelHarga' || a.jenis === 'teks';
         onUbahGambar(sg.id, satuTitik ? { t1: m.t, h1: m.h, t2: m.t, h2: m.h } : { t1: m.t, h1: m.h });
       } else {
         onUbahGambar(sg.id, { t2: m.t, h2: m.h });
@@ -1956,11 +2021,13 @@ export function ChartLilin({
     };
   }, [onUbahGambar]);
 
-  const tarikAlat = useRef<{ t1: number; h1: number; d: number } | null>(null);
+  const tarikAlat = useRef<object | null>(null);
   useEffect(() => {
     if (!alat || !onAlatSelesai) return;
     const el = kotak.current;
     if (!el) return;
+    /* "Kembalikan zoom" bertindak seketika — lihat efeknya sendiri di bawah. */
+    if (alat === 'zoomKeluar') return;
 
     const posisiDari = (e: MouseEvent, bolehMagnet = true): { t: number; h: number } | null => {
       const c = chart.current, s = seri.current;
@@ -2006,7 +2073,7 @@ export function ChartLilin({
        tidak boleh mengubah apa pun adalah gerakan yang menipu. */
     /* Garis horizontal & vertikal ikut jalur sekali-klik yang sama: yang
        ditentukan orang cuma SATU nilai — harga, atau saat. */
-    if (alat === 'rayH' || alat === 'garisH' || alat === 'garisV') {
+    if (alat === 'rayH' || alat === 'garisH' || alat === 'garisV' || alat === 'labelHarga') {
       const jenisSatu = alat;
       const tempelRay = (e: PointerEvent) => {
         if (e.button !== 0) return;
@@ -2018,6 +2085,25 @@ export function ChartLilin({
       };
       el.addEventListener('pointerdown', tempelRay);
       return () => el.removeEventListener('pointerdown', tempelRay);
+    }
+
+    /* ── TEKS ─────────────────────────────────────────────────────────────
+       Klik membuka kotak ketik di titik itu; gambarnya baru dibuat saat
+       isinya disimpan. Klik lain selagi kotak ketik terbuka cuma menutupnya
+       (blur menyimpan) — bukan membuka kotak kedua. */
+    if (alat === 'teks') {
+      const tempelTeks = (e: PointerEvent) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (ketikTeksRef.current) return;
+        const p = posisiDari(e);
+        if (!p) return;
+        const r = el.getBoundingClientRect();
+        setKetikTeks({ t: p.t, h: p.h, nilai: '', x: e.clientX - r.left, y: e.clientY - r.top });
+      };
+      el.addEventListener('pointerdown', tempelTeks, true);
+      return () => el.removeEventListener('pointerdown', tempelTeks, true);
     }
 
     /* ── KUAS ─────────────────────────────────────────────────────────────
@@ -2140,57 +2226,115 @@ export function ChartLilin({
     /* Channel membawa lebar awalnya (`d`, selisih harga garis sejajar):
        40 px di bawah garis dasar pada saat tarikan dimulai — terlihat jelas
        sebagai channel sejak awal, lalu disesuaikan lewat pegangan lebar. */
-    const bentuk = (t1: number, h1: number, t2: number, h2: number, d = 0): Omit<GambarAlat, 'id'> =>
-      (alat === 'channel' ? { jenis: alat, t1, h1, t2, h2, h3: d } : { jenis: alat, t1, h1, t2, h2 });
+    const bentuk = (t1: number, h1: number, t2: number, h2: number, d = 0,
+                    t3?: number, h3?: number): Omit<GambarAlat, 'id'> => {
+      if (alat === 'channel') return { jenis: alat, t1, h1, t2, h2, h3: d };
+      if (alat === 'fibExt') {
+        return t3 != null && h3 != null ? { jenis: alat, t1, h1, t2, h2, t3, h3 } : { jenis: alat, t1, h1, t2, h2 };
+      }
+      if (alat === 'zoom') return { jenis: 'zoomArea', t1, h1, t2, h2 };
+      return { jenis: alat, t1, h1, t2, h2 };
+    };
 
-    const turun = (e: MouseEvent) => {
+    /* ── DUA CARA MENARUH TITIK, SEPERTI TRADINGVIEW ──────────────────────
+       Dilaporkan pemilik 29 Sep 2026: garis tren dan fibonacci harus
+       "diklik tekan dulu, diseret, baru terbentuk" — di TradingView cukup
+       klik titik pertama, gerakkan tetikus, klik titik kedua.
+
+       Keduanya jalan sekarang:
+         TEKAN–SERET–LEPAS  dilepas >4 px dari titik awal → titik kedua di
+                            tempat jari dilepas (cara lama; tetap satu-
+                            satunya cara yang wajar di layar sentuh).
+         KLIK–GERAK–KLIK    dilepas di tempat → pratinjau ikut kursor TANPA
+                            tombol ditekan, klik berikutnya titik kedua.
+       Fib extension butuh titik ketiga: sesudah titik kedua, satu klik lagi.
+       Escape (di bilah) melepas alatnya dan membuang yang belum selesai. */
+    type Susun = { t1: number; h1: number; d: number; x0: number; y0: number; xa: number;
+                   fase: 'tarik' | 'klik' | 'titik3'; t2?: number; h2?: number };
+    let s: Susun | null = null;
+    const bersih = () => { s = null; tarikAlat.current = null; alatPrim.current?.setPratinjau(null); };
+    const relX = (e: MouseEvent) => e.clientX - el.getBoundingClientRect().left;
+
+    /* Alat zoom: yang dipakai cuma rentang WAKTU yang ditarik, dari
+       koordinat pikselnya langsung — tidak ada harga yang disimpan. */
+    const zoomKe = (xa: number, xb: number) => {
+      const c = chart.current;
+      if (!c) return;
+      const skala = c.timeScale();
+      const la = skala.coordinateToLogical(Math.min(xa, xb));
+      const lb = skala.coordinateToLogical(Math.max(xa, xb));
+      if (la == null || lb == null || lb - la < 3) return;   // kurang dari 3 bar: bukan zoom, salah klik
+      const kini = skala.getVisibleLogicalRange();
+      if (kini) tumpukZoom.current.push({ from: kini.from, to: kini.to });
+      skala.setVisibleLogicalRange({ from: la, to: lb });
+    };
+    const selesai = (g: Omit<GambarAlat, 'id'>, xAkhir: number) => {
+      const xa = s?.xa ?? xAkhir;
+      bersih();
+      if (alat === 'zoom') { zoomKe(xa, xAkhir); lepasAlatRef.current?.(); return; }
+      onAlatSelesai(g);
+    };
+    const pratinjau = (p: { t: number; h: number }) => {
+      if (!s) return;
+      if (s.fase === 'titik3' && s.t2 != null && s.h2 != null) {
+        alatPrim.current?.setPratinjau(bentuk(s.t1, s.h1, s.t2, s.h2, s.d, p.t, p.h));
+      } else alatPrim.current?.setPratinjau(bentuk(s.t1, s.h1, p.t, p.h, s.d));
+    };
+    /** Menaruh titik kedua. false = sama dengan titik pertama (diabaikan). */
+    const titikKedua = (p: { t: number; h: number }, xAkhir: number): boolean => {
+      if (!s || (Math.abs(p.t - s.t1) <= 1 && p.h === s.h1)) return false;
+      if (alat === 'fibExt') {
+        s = { ...s, fase: 'titik3', t2: p.t, h2: p.h };
+        tarikAlat.current = s;
+        pratinjau(p);
+        return true;
+      }
+      selesai(bentuk(s.t1, s.h1, p.t, p.h, s.d), xAkhir);
+      return true;
+    };
+
+    const turun = (e: PointerEvent) => {
       if (e.button !== 0) return;
       const p = posisiDari(e);
       if (!p) return;
-      let d = 0;
-      if (alat === 'channel') {
-        const s = seri.current;
-        const yy = s?.priceToCoordinate(p.h);
-        const hb = s && yy != null ? s.coordinateToPrice(yy + 40) : null;
-        if (typeof hb === 'number' && isFinite(hb)) d = hb - p.h;
-      }
-      tarikAlat.current = { t1: p.t, h1: p.h, d };
-      alatPrim.current?.setPratinjau(bentuk(p.t, p.h, p.t, p.h, d));
       e.preventDefault();
       e.stopPropagation();
-    };
-    const gerak = (e: MouseEvent) => {
-      const a = tarikAlat.current;
-      if (!a) return;
-      const p = posisiDari(e);
-      if (!p) return;
-      alatPrim.current?.setPratinjau(bentuk(a.t1, a.h1, p.t, p.h, a.d));
-    };
-    const lepas = (e: MouseEvent) => {
-      const a = tarikAlat.current;
-      if (!a) return;
-      tarikAlat.current = null;
-      alatPrim.current?.setPratinjau(null);
-      const p = posisiDari(e);
-      /* Klik tanpa tarikan bukan gambar — titik tunggal tidak menyimpan
-         informasi apa pun. */
-      /* Klik tanpa tarikan bukan gambar — titik tunggal tidak menyimpan
-         informasi apa pun. (Alat posisi justru sebaliknya: ia ditempel
-         dengan sekali klik, dan tidak pernah sampai ke baris ini.) */
-      if (p && (Math.abs(p.t - a.t1) > 1 || p.h !== a.h1)) {
-        onAlatSelesai(bentuk(a.t1, a.h1, p.t, p.h, a.d));
+      if (!s) {
+        let d = 0;
+        if (alat === 'channel') {
+          const sr = seri.current;
+          const yy = sr?.priceToCoordinate(p.h);
+          const hb = sr && yy != null ? sr.coordinateToPrice(yy + 40) : null;
+          if (typeof hb === 'number' && isFinite(hb)) d = hb - p.h;
+        }
+        s = { t1: p.t, h1: p.h, d, x0: e.clientX, y0: e.clientY, xa: relX(e), fase: 'tarik' };
+        tarikAlat.current = s;
+        pratinjau(p);
+        return;
+      }
+      if (s.fase === 'klik') { titikKedua(p, relX(e)); return; }
+      if (s.fase === 'titik3' && s.t2 != null && s.h2 != null) {
+        selesai(bentuk(s.t1, s.h1, s.t2, s.h2, s.d, p.t, p.h), relX(e));
       }
     };
-    /* pointercancel ≠ pointerup: koordinat pada cancel tidak bisa
-       dipercaya, jadi tarikannya DIBUANG, bukan dikomit jadi gambar. */
-    const batal = () => { tarikAlat.current = null; alatPrim.current?.setPratinjau(null); };
-    /* Fase capture: menang atas penangan chart & garis seret. Pointer,
-       bukan mouse — supaya menggambar dengan jari juga jalan.
-
-       Selama alat terpasang, geser/zoom chart DIMATIKAN: stopPropagation
-       menahan mousedown dari lightweight-charts, tapi pustaka itu memasang
-       pendengar touchstart-nya sendiri yang tidak ikut tertahan — di HP,
-       menarik kotak SNR jadi sekaligus menggeser chartnya. */
+    const gerak = (e: PointerEvent) => {
+      if (!s) return;
+      const p = posisiDari(e);
+      if (p) pratinjau(p);
+    };
+    const lepas = (e: PointerEvent) => {
+      if (!s || s.fase !== 'tarik') return;
+      const diseret = Math.hypot(e.clientX - s.x0, e.clientY - s.y0) > 4;
+      const p = diseret ? posisiDari(e) : null;
+      if (p && titikKedua(p, relX(e))) return;
+      /* Dilepas di tempat (atau di titik yang sama): tunggu klik kedua. */
+      if (s) { s = { ...s, fase: 'klik' }; tarikAlat.current = s; }
+    };
+    /* pointercancel: koordinatnya tidak bisa dipercaya — buang. */
+    const batal = () => bersih();
+    /* Fase capture: menang atas penangan chart & garis seret. Selama alat
+       terpasang geser/zoom chart DIMATIKAN — lightweight-charts memasang
+       pendengar sentuhnya sendiri yang tidak ikut tertahan stopPropagation. */
     chart.current?.applyOptions({ handleScroll: false, handleScale: false });
     el.addEventListener('pointerdown', turun, true);
     window.addEventListener('pointermove', gerak);
@@ -2202,10 +2346,20 @@ export function ChartLilin({
       window.removeEventListener('pointermove', gerak);
       window.removeEventListener('pointerup', lepas);
       window.removeEventListener('pointercancel', batal);
-      tarikAlat.current = null;
-      alatPrim.current?.setPratinjau(null);
+      bersih();
     };
   }, [alat, onAlatSelesai]);
+
+  /* "Kembalikan zoom": ambil rentang sebelum zoom terakhir; kalau tumpukannya
+     kosong, kembali ke skala waktu bawaan. Lalu lepaskan alatnya — ini
+     tombol aksi, bukan alat yang dipegang. */
+  useEffect(() => {
+    if (alat !== 'zoomKeluar') return;
+    const skala = chart.current?.timeScale();
+    const r = tumpukZoom.current.pop();
+    if (skala) { if (r) skala.setVisibleLogicalRange(r); else skala.resetTimeScale(); }
+    lepasAlatRef.current?.();
+  }, [alat]);
 
   /* ── Menempelkan hamparan ke skala harga ───────────────────────────
      Posisinya ditulis LANGSUNG ke gaya elemennya di dalam
@@ -2241,6 +2395,36 @@ export function ChartLilin({
      mendarat di angka BULAT yang orangnya punya di kepala — dan garis
      harga justru dipakai untuk menandai angka yang sudah diketahui. */
   const [ketikRay, setKetikRay] = useState<{ id: string; nilai: string; x: number; y: number } | null>(null);
+
+  /* ── KOTAK KETIK TEKS ───────────────────────────────────────────────────
+     `id` kosong = teks BARU yang belum jadi gambar: gambarnya baru dibuat
+     saat isinya disimpan, jadi klik yang batal tidak meninggalkan gambar
+     kosong tak kasatmata. `id` terisi = menyunting teks yang sudah ada.
+     Ref pendamping mencegah simpan dua kali (Enter lalu blur). */
+  const [ketikTeks, setKetikTeks] = useState<{ id?: string; t: number; h: number; nilai: string; x: number; y: number } | null>(null);
+  const ketikTeksRef = useRef(ketikTeks);
+  ketikTeksRef.current = ketikTeks;
+  const simpanTeks = () => {
+    const k = ketikTeksRef.current;
+    if (!k) return;
+    ketikTeksRef.current = null;
+    setKetikTeks(null);
+    const isi = k.nilai.replace(/\s+$/, '');
+    if (k.id) {
+      if (isi.trim()) onUbahGambar?.(k.id, { teks: isi });
+      else onBuangGambar?.(k.id);
+    } else if (isi.trim()) {
+      onAlatSelesai?.({ jenis: 'teks', t1: k.t, h1: k.h, t2: k.t, h2: k.h, teks: isi });
+    }
+  };
+  /* Rentang yang dilihat SEBELUM tiap zoom masuk — "Kembalikan zoom"
+     mengambilnya satu per satu. */
+  const tumpukZoom = useRef<{ from: number; to: number }[]>([]);
+  /* Lewat ref: pemanggil mengirim fungsi baru tiap render, dan menaruhnya
+     di dependensi efek menggambar akan memutus gambar yang sedang disusun
+     setiap kali harga berdetak. */
+  const lepasAlatRef = useRef(onLepasAlat);
+  lepasAlatRef.current = onLepasAlat;
 
   /* ── ZOOM & GESER GAMBAR ACUAN ──────────────────────────────────────
      Nilainya dipegang pemanggil (`jiplak.zoom/x/y`), tapi selama jari masih
@@ -2996,6 +3180,7 @@ export function ChartLilin({
     const el = kotak.current;
     if (!el || !onUbahGambar) return;
     const ganda = (e: MouseEvent) => {
+      if (acuanPilih.current.kunci) return;
       const s = seri.current;
       if (!s) return;
       const r = el.getBoundingClientRect();
@@ -3016,6 +3201,20 @@ export function ChartLilin({
         return c.timeScale().logicalToCoordinate(
           (times.length - 1 + (t - times[times.length - 1]) / tfRef.current) as Logical);
       };
+      /* Klik ganda pada TEKS membuka kotak ketiknya lagi, berisi tulisan
+         yang ada — menyunting, bukan menulis ulang dari nol. */
+      for (const g of (acuanPilih.current.gambarAlat ?? [])) {
+        if (g.jenis !== 'teks') continue;
+        const tx = X(g.t1), ty = s.priceToCoordinate(g.h1);
+        if (tx == null || ty == null) continue;
+        const u = ukurTeks(g.teks ?? '');
+        if (px >= tx && px <= tx + u.w && py >= ty && py <= ty + u.h) {
+          setKetikTeks({ id: g.id, t: g.t1, h: g.h1, nilai: g.teks ?? '', x: tx, y: ty });
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
       for (const g of (acuanPilih.current.gambarAlat ?? [])) {
         if (g.jenis !== 'rayH' && g.jenis !== 'garisH') continue;
         const y1 = s.priceToCoordinate(g.h1);
@@ -3612,6 +3811,24 @@ export function ChartLilin({
             className="cursor-pointer rounded bg-zinc-100 px-2 py-1 text-[11.5px] font-semibold text-zinc-950 transition-colors hover:bg-white">
             OK
           </button>
+        </div>
+      )}
+
+      {ketikTeks && (
+        <div className="absolute z-30"
+             style={{ left: Math.max(4, Math.min(ketikTeks.x, (kotak.current?.clientWidth || 400) - 236)),
+                      top: Math.max(4, ketikTeks.y) }}>
+          <textarea autoFocus value={ketikTeks.nilai}
+            rows={Math.min(6, Math.max(1, ketikTeks.nilai.split('\n').length))}
+            placeholder="Ketik teks… Enter simpan · Shift+Enter baris baru"
+            onChange={(e) => setKetikTeks({ ...ketikTeks, nilai: e.target.value })}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); simpanTeks(); }
+              if (e.key === 'Escape') { e.preventDefault(); ketikTeksRef.current = null; setKetikTeks(null); }
+            }}
+            onBlur={simpanTeks}
+            className="w-56 resize-none rounded-md border border-zinc-600 bg-zinc-950/95 px-2 py-1.5 text-[12.5px] leading-4 text-zinc-100 shadow-xl outline-none placeholder:text-zinc-500 focus:border-zinc-400" />
         </div>
       )}
 
