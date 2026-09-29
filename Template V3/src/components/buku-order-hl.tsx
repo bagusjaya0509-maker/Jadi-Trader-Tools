@@ -30,7 +30,6 @@ import { Memuat } from '@/components/memuat';
 
 const API = 'https://api.hyperliquid.xyz';
 const WS = 'wss://api.hyperliquid.xyz/ws';
-const KUNCI_BUKA = 'jt.bukuOrder.buka';
 const TINGGI_BARIS = 19;
 
 interface Level { px: number; sz: number }
@@ -89,15 +88,6 @@ function ringkas(v: number): string {
   return v.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
-function bacaBuka(): boolean {
-  try {
-    const v = localStorage.getItem(KUNCI_BUKA);
-    if (v !== null) return v === '1';
-  } catch { /* privat */ }
-  /* Belum pernah memilih: terbuka kalau layarnya cukup lebar untuk chart
-     yang tetap layak dibaca sesudah dikurangi 232 px. */
-  return typeof window !== 'undefined' && window.innerWidth >= 1100;
-}
 
 export function BukuOrderHl({ simbol, tinggi, bisaIsi, onPilihHarga, onLebar }: {
   simbol: string;
@@ -111,11 +101,12 @@ export function BukuOrderHl({ simbol, tinggi, bisaIsi, onPilihHarga, onLebar }: 
    *  duduk di atas order book. Angka tetap, bukan hasil ukur. */
   onLebar?: (px: number) => void;
 }) {
-  const [buka, setBukaState] = useState(bacaBuka);
-  const setBuka = (v: boolean) => {
-    setBukaState(v);
-    try { localStorage.setItem(KUNCI_BUKA, v ? '1' : '0'); } catch { /* privat */ }
-  };
+  /* ── SELALU TERLIPAT SAAT HALAMAN DIBUKA ─────────────────────────────
+     Diminta pemilik 30 Sep 2026: order book baru tampil kalau orangnya
+     sendiri yang membuka — tidak disimpan, tidak dipulihkan. Selama
+     terlipat TIDAK ADA sambungan sama sekali: meta tidak diminta, WebSocket
+     tidak dibuka. Membuka lalu melipat lagi menutup sambungannya. */
+  const [buka, setBuka] = useState(false);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [galatMeta, setGalatMeta] = useState('');
   const [buku, setBuku] = useState<{ bid: Level[]; ask: Level[] } | null>(null);
@@ -128,6 +119,7 @@ export function BukuOrderHl({ simbol, tinggi, bisaIsi, onPilihHarga, onLebar }: 
 
   /* ── Koin dari meta ─────────────────────────────────────────────────── */
   useEffect(() => {
+    if (!buka) return;
     let hidup = true;
     setMeta(null); setBuku(null); setIKelompok(0); setGalatMeta('');
     ambilMeta()
@@ -138,7 +130,7 @@ export function BukuOrderHl({ simbol, tinggi, bisaIsi, onPilihHarga, onLebar }: 
       })
       .catch(() => { if (hidup) setGalatMeta('Daftar koin Hyperliquid tidak terbaca.'); });
     return () => { hidup = false; };
-  }, [simbol]);
+  }, [simbol, buka]);
 
   const tengah = buku && buku.bid[0] && buku.ask[0] ? (buku.bid[0].px + buku.ask[0].px) / 2 : 0;
   /* Pilihan dihitung ulang hanya saat ORDE harganya berganti — bukan tiap

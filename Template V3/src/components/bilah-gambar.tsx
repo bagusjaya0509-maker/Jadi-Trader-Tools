@@ -81,7 +81,12 @@ type Butir =
   | { macam: 'kursor'; nilai: Kursor; nama: string; ikon: string }
   | { macam: 'alat'; nilai: AlatPegang; nama: string; ikon: string; pintas?: string };
 
-interface Grup { id: string; judul: string; butir: Butir[]; pisahSebelum?: boolean }
+interface Grup {
+  id: string; judul: string; butir: Butir[]; pisahSebelum?: boolean;
+  /** Di layar lebar, isinya dijabarkan jadi tombol sendiri-sendiri (tanpa
+   *  menu samping). Di ponsel tetap satu grup. */
+  jabarDesktop?: boolean;
+}
 
 const GRUP: Grup[] = [
   { id: 'kursor', judul: 'Kursor', butir: [
@@ -111,7 +116,11 @@ const GRUP: Grup[] = [
     { macam: 'alat', nilai: 'teks', nama: 'Teks', ikon: 'teks' },
     { macam: 'alat', nilai: 'labelHarga', nama: 'Label harga', ikon: 'labelHarga' },
   ] },
-  { id: 'posisi', judul: 'Posisi & ukur', butir: [
+  /* Dijabarkan di desktop atas permintaan pemilik 29 Sep 2026: kolomnya
+     menyisakan ruang kosong di bawah, dan lima alat ini yang paling sering
+     dipakai bergantian saat menyusun setup — satu klik lebih cepat daripada
+     membuka menu. Di ponsel tetap satu grup: tinggi layarnya tidak cukup. */
+  { id: 'posisi', judul: 'Posisi & ukur', jabarDesktop: true, butir: [
     { macam: 'alat', nilai: 'posisiBeli', nama: 'Posisi long', ikon: 'posisiBeli' },
     { macam: 'alat', nilai: 'posisiJual', nama: 'Posisi short', ikon: 'posisiJual' },
     { macam: 'alat', nilai: 'ukurHarga', nama: 'Rentang harga', ikon: 'ukurHarga' },
@@ -220,9 +229,32 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
    *  atas daftar panel itu. */
   kiriTerlipat?: number;
 }) {
-  const { kursor, magnet, magnetTerakhir, tetap, kunci, sembunyi, pilihan, ubah, tampil, setBuka } = setelan;
+  const { kursor, magnet, magnetTerakhir, tetap, kunci, sembunyi, pilihan, ubah, sempit, tampil, setBuka } = setelan;
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  /* ── RUANG TEGAK ─────────────────────────────────────────────────────
+     Kolomnya duduk di dalam wadah setinggi chart dan TIDAK boleh ikut
+     menentukan tinggi itu — kalau boleh, lima tombol tambahan dari grup
+     yang dijabarkan memanjangkan seluruh baris chart dan tombol terbawah
+     jatuh di luar kartu (terjadi 29 Sep 2026: kolom 612 px di chart
+     460 px). Jadi isinya `absolute inset-0`, dan tinggi wadahnya diukur:
+     grup dijabarkan hanya kalau muat. ResizeObserver ditemani resize
+     jendela — di panel pratinjau ia pernah tidak menyala sama sekali. */
+  const luarRef = useRef<HTMLDivElement>(null);
+  const [ruang, setRuang] = useState(0);
+  useEffect(() => {
+    const el = luarRef.current;
+    if (!el) return;
+    const ukur = () => setRuang(el.clientHeight);
+    ukur();
+    const ro = new ResizeObserver(ukur);
+    ro.observe(el);
+    window.addEventListener('resize', ukur);
+    return () => { ro.disconnect(); window.removeEventListener('resize', ukur); };
+  }, [tampil]);
+  /* 17 tombol × 34 px + dua garis pisah + bantalan ≈ 612 px. */
+  const jabar = !sempit && ruang >= 616;
 
   /* Memegang alat saat gambar disembunyikan: yang baru digambar harus
      terlihat, jadi sembunyi dimatikan — persis yang dilakukan TradingView. */
@@ -335,8 +367,31 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
        40 px — lebih setengah piksel. Tanpa ini peramban memasang batang
        gulir mendatar tipis di dasar kolom: "slide bar kecil" yang
        dilaporkan pemilik 29 Sep 2026 (terukur clientWidth 39, scrollWidth 40). */
-    <div className="flex w-10 shrink-0 flex-col items-center gap-0.5 overflow-y-auto overflow-x-hidden border-r border-zinc-800/80 bg-zinc-950 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    /* TANPA garis batas kanan (30 Sep 2026, meniru Hyperliquid): garis
+       tegak di sisi kolom berdiri persis di sebelah garis kisi pertama
+       chart dan terbaca sebagai garis dobel. */
+    <div ref={luarRef} className="relative w-10 shrink-0 bg-zinc-950">
+    <div className="absolute inset-0 flex flex-col items-center gap-0.5 overflow-y-auto overflow-x-hidden py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {GRUP.map((g) => {
+        if (g.jabarDesktop && jabar) {
+          return (
+            <div key={g.id} className="flex flex-col items-center gap-0.5">
+              {g.butir.map((x) => {
+                const on = x.macam === 'alat' ? alat === x.nilai : !alat && kursor === x.nilai;
+                const judulX = x.macam === 'alat' && x.pintas ? `${x.nama} · ${x.pintas}` : x.nama;
+                return (
+                  <button key={String(x.nilai)} onClick={() => {
+                    if (x.macam === 'alat' && alat === x.nilai) { pegang(null); return; }
+                    pakai(g, x);
+                  }} title={judulX} aria-pressed={on}
+                    className={cn(tombol, 'shrink-0', on ? nyala : biasa)}>
+                    <Ik>{IKON[x.ikon]}</Ik>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        }
         const b = butirAktif(g);
         const on = grupMenyala(g);
         const judul = b.macam === 'alat' && b.pintas ? `${b.nama} · ${b.pintas}` : b.nama;
@@ -450,6 +505,7 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
         </div>,
         document.body,
       )}
+    </div>
     </div>
   );
 }
