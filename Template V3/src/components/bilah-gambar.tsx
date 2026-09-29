@@ -198,9 +198,11 @@ export function useSetelanBilah() {
     setBukaState(v);
     try { localStorage.setItem(KUNCI_BUKA, v ? '1' : '0'); } catch { /* privat */ }
   }, []);
-  /** Kolomnya benar-benar tampil: selalu di layar lebar, di layar sempit
-   *  menurut pilihan orangnya. */
-  const tampil = !sempit || buka;
+  /** Kolomnya benar-benar tampil. Tombol sembunyikan dikembalikan ke semua
+   *  lebar layar 29 Sep 2026 — yang ingin dibuang pemilik ternyata batang
+   *  gulir tipis di dasar kolom, bukan tombol ini. `sempit` tetap dipakai
+   *  untuk bawaan terlipat di ponsel (lihat bacaBuka). */
+  const tampil = buka;
   return { ...s, buka, sempit, tampil, ubah, setBuka };
 }
 export type SetelanBilah = ReturnType<typeof useSetelanBilah>;
@@ -218,7 +220,7 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
    *  atas daftar panel itu. */
   kiriTerlipat?: number;
 }) {
-  const { kursor, magnet, magnetTerakhir, tetap, kunci, sembunyi, pilihan, ubah, sempit, tampil, setBuka } = setelan;
+  const { kursor, magnet, magnetTerakhir, tetap, kunci, sembunyi, pilihan, ubah, tampil, setBuka } = setelan;
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -328,7 +330,12 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
   const grupMenu = menu && GRUP.find((g) => g.id === menu.id);
 
   return (
-    <div className="flex w-10 shrink-0 flex-col items-center gap-0.5 overflow-y-auto border-r border-zinc-800/80 bg-zinc-950 py-1.5 [scrollbar-width:none]">
+    /* overflow-x-hidden WAJIB. Kolom 40 px dengan garis kanan 1 px cuma
+       menyisakan 39 px isi, sedangkan panah menu tiap grup menjulur sampai
+       40 px — lebih setengah piksel. Tanpa ini peramban memasang batang
+       gulir mendatar tipis di dasar kolom: "slide bar kecil" yang
+       dilaporkan pemilik 29 Sep 2026 (terukur clientWidth 39, scrollWidth 40). */
+    <div className="flex w-10 shrink-0 flex-col items-center gap-0.5 overflow-y-auto overflow-x-hidden border-r border-zinc-800/80 bg-zinc-950 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {GRUP.map((g) => {
         const b = butirAktif(g);
         const on = grupMenyala(g);
@@ -400,15 +407,11 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
         <Trash2 className="size-[17px]" strokeWidth={1.6} />
       </button>
 
-      {sempit && (
-        <>
-          <div className="min-h-2 flex-1" />
-          <button onClick={() => setBuka(false)} title="Sembunyikan bilah alat gambar"
-            className={cn(tombol, 'size-7 text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300')}>
-            <ChevronsLeft className="size-3.5" />
-          </button>
-        </>
-      )}
+      <div className="min-h-2 flex-1" />
+      <button onClick={() => setBuka(false)} title="Sembunyikan bilah alat gambar"
+        className={cn(tombol, 'size-7 shrink-0 text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300')}>
+        <ChevronsLeft className="size-3.5" />
+      </button>
 
       {/* ── MENU SAMPING ─────────────────────────────────────────────────
           Lewat portal ke <body>: wadah chart ber-overflow-hidden, dan menu

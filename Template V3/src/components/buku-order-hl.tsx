@@ -99,13 +99,17 @@ function bacaBuka(): boolean {
   return typeof window !== 'undefined' && window.innerWidth >= 1100;
 }
 
-export function BukuOrderHl({ simbol, tinggi, bisaIsi, onPilihHarga }: {
+export function BukuOrderHl({ simbol, tinggi, bisaIsi, onPilihHarga, onLebar }: {
   simbol: string;
   /** Tinggi chart — order book setinggi chart di sebelahnya. */
   tinggi: number;
   /** Tiket BUY/SELL sedang terbuka: klik harga mengisi harga entry-nya. */
   bisaIsi: boolean;
   onPilihHarga: (harga: number) => void;
+  /** Lebar kolom ini (232 terbuka, 24 terlipat, 0 saat hilang) — dipakai
+   *  ikon multi-chart & setelan di pojok chart supaya tetap di chart, tidak
+   *  duduk di atas order book. Angka tetap, bukan hasil ukur. */
+  onLebar?: (px: number) => void;
 }) {
   const [buka, setBukaState] = useState(bacaBuka);
   const setBuka = (v: boolean) => {
@@ -119,6 +123,8 @@ export function BukuOrderHl({ simbol, tinggi, bisaIsi, onPilihHarga }: {
   const [iKelompok, setIKelompok] = useState(0);
   const [satuan, setSatuan] = useState<'koin' | 'usd'>('koin');
   const terakhir = useRef(0);
+  useEffect(() => { onLebar?.(buka ? 232 : 24); }, [buka, onLebar]);
+  useEffect(() => () => onLebar?.(0), [onLebar]);
 
   /* ── Koin dari meta ─────────────────────────────────────────────────── */
   useEffect(() => {

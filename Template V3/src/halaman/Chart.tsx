@@ -964,6 +964,9 @@ export default function ChartBacktest() {
   /* Lebar kolom Pine, 0 saat tertutup. Ikut dihitung di tepi kanan
      hamparan kaki chart — lihat catatan di sana. */
   const [lebarPine, setLebarPine] = useState(0);
+  /* Lebar order book Hyperliquid (0 kalau tidak tampil) — ikon di pojok
+     chart ikut bergeser sejauh ini, sama seperti watchlist & dock Pine. */
+  const [lebarBuku, setLebarBuku] = useState(0);
   const [aksi, setAksi] = useState<AksiOrder | null>(null);
   const [pine, setPine] = useState<HasilPine | null>(null);
   /* ── Menu indikator, dock Pine, watchlist, alat gambar ─────────────
@@ -5493,7 +5496,7 @@ ${pnlSunting !== null
                           posisiMt5={modeNyata ? posisiMt5Chart : KOSONG_POSISI}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
                           hargaAsk={modeNyata ? askTampil : undefined}
-                          kunciUkuran={lebarWatch}
+                          kunciUkuran={lebarWatch + lebarBuku}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
                           bagikanFoto={(ambil) => { ambilFoto.current = ambil; }}
@@ -6392,7 +6395,7 @@ ${pnlSunting !== null
           {!POLOS && bacaPasar(simbol) === 'hyperliquid' && (
             /* Harus ada TIKET BUY/SELL (draf), bukan cuma panel order yang
                terbuka: tanpa tiket, entry yang diisi tidak punya tempat. */
-            <BukuOrderHl simbol={simbol} tinggi={tinggiChart} bisaIsi={!!aksi && !!draf}
+            <BukuOrderHl simbol={simbol} tinggi={tinggiChart} bisaIsi={!!aksi && !!draf} onLebar={setLebarBuku}
               onPilihHarga={(px) => {
                 if (!aksi || !draf) return;
                 entryDigeser.current = true;
@@ -6454,7 +6457,7 @@ ${pnlSunting !== null
               sumbu waktu/harga dan IKUT bergeser saat watchlist ditarik. */}
           <div className={cn('pointer-events-none absolute bottom-0 left-0 z-[25] flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
             POLOS && 'hidden')}
-               style={{ right: lebarWatch + lebarPine + 6 + 8 }}>
+               style={{ right: lebarWatch + lebarPine + lebarBuku + 6 + 8 }}>
             {/* GERIGI PINDAH KE UJUNG KANAN, berjejer dengan ikon multi —
                 lihat kelompok ikon di bawah. Dulu ia sendirian di pojok kiri,
                 terpisah sejauh lebar chart dari satu-satunya sakelar lain di
