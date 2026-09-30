@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react';
 
-/* Berapa lama panel order menganggur sebelum melipat sendiri. Cukup
-   lama untuk berpikir, cukup singkat supaya tidak menginap di atas
-   lilin yang sedang dibaca. */
-const JEDA_LIPAT_SENDIRI_MS = 12_000;
 import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass, Share2, Copy, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
@@ -32,8 +28,6 @@ export interface RencanaOrder { entry?: number; sl?: number; tp?: number }
 const KELAS_ISIAN =
   'h-7 w-full rounded border border-zinc-700 bg-zinc-900 px-1.5 text-[11px] text-zinc-100 ' +
   'outline-none transition-colors focus-visible:border-zinc-500';
-
-const KUNCI_TUTUP = 'jt.pojokTutup';
 
 /* ── Isian angka: bisa dikosongkan, bisa dinaik-turunkan ────────────────
    Model lama `value={n || ''} onChange={Number(v) || 0}` punya dua cacat
@@ -361,12 +355,15 @@ export function PojokOrder({
      Saat ada tiket, posisi, atau pending, panelnya SELALU tampil: keadaan
      yang sedang membawa uang tidak boleh tersembunyi di balik ikon, dan
      ketiga cabang itu memang berada di atas penjaga ini. */
-  const [tutupPanel, setTutupPanel] = useState(() => {
-    try {
-      const v = localStorage.getItem(KUNCI_TUTUP);
-      return v === null ? true : v === '1';
-    } catch { return true; }
-  });
+  /* ── DIUBAH 30 Sep 2026: BAWAANNYA TERBUKA, DAN TIDAK DIINGAT ────────
+     Pemilik minta bilah BUY/SELL selalu terlihat saat chart dibuka, di
+     ponsel juga — bukan ikon. Tiga hal lama yang membuatnya hampir selalu
+     jadi ikon dibuang sekaligus: bawaan terlipat, lipat-sendiri sesudah
+     12 detik menganggur, dan penyimpanan status lipat (lipat-sendiri itu
+     menulis '1', jadi kunjungan berikutnya pun mulai terlipat). Tombol
+     lipat (−) tetap ada, tapi cuma berlaku sampai halaman dimuat ulang.
+     Catatan lama di atas dibiarkan sebagai riwayat alasannya. */
+  const [tutupPanel, setTutupPanel] = useState(false);
   /* ── MELIPAT SENDIRI SAAT MEMANG SEDANG TIDAK DIPAKAI ───────────────
      Hanya kalau tidak ada apa pun yang hidup: tidak ada posisi terbuka,
      tidak ada pending, dan tidak ada tiket yang sedang disusun. Dalam
@@ -376,7 +373,6 @@ export function PojokOrder({
      Penghitungnya disetel ulang tiap kali pointer menyentuh atau sekadar
      masuk ke areanya. Panel yang melipat tepat saat jari sedang menuju
      tombol BUY jauh lebih buruk daripada panel yang menetap. */
-  const [sentuh, setSentuh] = useState(0);
 
   /* ── TIKET RINGKAS ────────────────────────────────────────
      Permintaan pemiliknya: tiketnya menutupi terlalu banyak lilin di
@@ -430,17 +426,8 @@ export function PojokOrder({
      yang baru saja diklik orangnya adalah "buka di chart" — ia datang untuk
      melihat grafiknya. Diminta pemilik 18 Sep 2026. */
   const [lipatCopy, setLipatCopy] = useState(true);
-  const bangunkan = () => setSentuh((n) => n + 1);
-  const menganggur = !posisi && !tunda && !draf;
-  useEffect(() => {
-    if (tutupPanel || !menganggur) return;
-    const t = setTimeout(() => aturTutup(true), JEDA_LIPAT_SENDIRI_MS);
-    return () => clearTimeout(t);
-  }, [tutupPanel, menganggur, sentuh]);
-
   function aturTutup(v: boolean) {
     setTutupPanel(v);
-    try { localStorage.setItem(KUNCI_TUTUP, v ? '1' : '0'); } catch { /* privat */ }
   }
 
   /* ── Lencana mode ─────────────────────────────────────────────────────
@@ -998,8 +985,7 @@ export function PojokOrder({
 
   /* ── Diam terbuka: pilih arah ──────────────────────────────────────── */
   return (
-    <div onPointerEnter={bangunkan} onPointerDown={bangunkan}
-         className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/85 px-1.5 py-1.5 backdrop-blur-sm">
+    <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/85 px-1.5 py-1.5 backdrop-blur-sm">
       {Lencana}
       {/* Lencana bursa DICABUT dari sini 10 Sep 2026 (pemilik). Ia sekarang
           duduk di sebelah harga terakhir di kepala halaman — satu lencana

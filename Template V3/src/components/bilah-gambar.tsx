@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Magnet, PencilLine, Lock, LockOpen, Eye, EyeOff, Trash2, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Magnet, PencilLine, Lock, LockOpen, Eye, EyeOff, Trash2, ChevronsLeft, ChevronsRight, Settings2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { POLOS } from '@/lib/multi-chart';
 import type { AlatPegang } from '@/lib/plugin-alat';
@@ -39,6 +39,24 @@ export type ModeMagnet = 'mati' | 'lemah' | 'kuat';
    sana bentuknya memang umum. Untuk ALAT, bentuk ikonnya harus menyerupai
    gambar yang akan jadi: sinar harus terlihat menjulur, garis horizontal
    harus terlihat selebar kotak, dan tidak ada ikon lucide yang begitu. */
+/** Satu baris sakelar di menu Setelan gambar (bilah padat). */
+function BarisSakelar({ aktif, onKlik, ikon, nama, ket }: {
+  aktif: boolean; onKlik: () => void; ikon: ReactNode; nama: string; ket: string;
+}) {
+  return (
+    <button onClick={onKlik} aria-pressed={aktif}
+      className={cn('flex w-full cursor-pointer items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-zinc-800/80',
+        aktif ? 'text-emerald-300' : 'text-zinc-200')}>
+      {ikon}
+      <span className="flex flex-1 flex-col">
+        <span className="text-[12.5px]">{nama}</span>
+        <span className="text-[10.5px] text-zinc-500">{ket}</span>
+      </span>
+      <Check className={cn('size-3.5 shrink-0', aktif ? 'opacity-100' : 'opacity-0')} />
+    </button>
+  );
+}
+
 function Ik({ children, kecil }: { children: ReactNode; kecil?: boolean }) {
   return (
     <svg viewBox="0 0 28 28" width={kecil ? 18 : 22} height={kecil ? 18 : 22} fill="none"
@@ -255,6 +273,21 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
   }, [tampil]);
   /* 17 tombol × 34 px + dua garis pisah + bantalan ≈ 612 px. */
   const jabar = !sempit && ruang >= 616;
+  /* ── PADAT: KOLOM PENDEK ─────────────────────────────────────────────
+     Dilaporkan pemilik 30 Sep 2026 dengan tangkapan layar iPhone: bilah
+     di ponsel "berantakan di bawah". Dua sebab sekaligus. Kolom lengkap
+     butuh ±476 px sedangkan chart ponsel cuma ±340 px, jadi kolomnya
+     menggulir dan ikon teratas terpotong. Dan tombol lepas di bawah
+     (pensil, gembok, mata, tempat sampah) adalah anak flex tanpa
+     shrink-0 — mereka MENCIUT ke tinggi ikonnya (±18 px) sementara magnet
+     yang berbungkus tetap 32 px, jadi jaraknya tidak rata.
+
+     Di kolom pendek, empat sakelar gambar (magnet, tetap menggambar,
+     kunci, sembunyi) dilipat jadi SATU tombol setelan bermenu, dan di
+     ponsel tombolnya 28 px. Tempat sampah tetap berdiri sendiri — ia yang
+     paling sering dicari. `ruang > 0`: sebelum terukur, jangan berkedip ke
+     bentuk padat di desktop. */
+  const padat = sempit || (ruang > 0 && ruang < 480);
 
   /* Memegang alat saat gambar disembunyikan: yang baru digambar harus
      terlihat, jadi sembunyi dimatikan — persis yang dilakukan TradingView. */
@@ -355,7 +388,15 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
     );
   }
 
-  const tombol = 'relative flex size-8 cursor-pointer items-center justify-center rounded-md transition-colors';
+  /* shrink-0 di SETIAP tombol — lihat catatan `padat` di atas. */
+  const tombol = cn('relative flex shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors',
+    sempit ? 'size-7' : 'size-8');
+  const tinggiPanah = sempit ? 'h-7' : 'h-8';
+  /* Sakelar yang MENGUBAH perilaku klik di chart. Kalau salah satunya
+     menyala saat terlipat di menu setelan, tombol setelannya ikut menyala —
+     gambar yang tidak bisa dipilih tanpa tanda apa pun terbaca sebagai
+     chart yang rusak. */
+  const setelanNyala = kunci || sembunyi;
   const biasa = 'text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-100';
   const nyala = 'bg-emerald-500/15 text-emerald-300';
 
@@ -396,7 +437,7 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
         const on = grupMenyala(g);
         const judul = b.macam === 'alat' && b.pintas ? `${b.nama} · ${b.pintas}` : b.nama;
         return (
-          <div key={g.id} className="group relative">
+          <div key={g.id} className="group relative shrink-0">
             {g.pisahSebelum && <div className="mx-auto mb-1 mt-0.5 h-px w-6 bg-zinc-800" />}
             <button onClick={() => klikGrup(g)} title={judul} aria-pressed={on}
               className={cn(tombol, on ? nyala : biasa)}>
@@ -411,8 +452,8 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
               <>
                 <button data-bilah-panah onClick={(e) => bukaMenu(g.id, e.currentTarget)}
                   title={`Pilihan ${g.judul.toLowerCase()}`}
-                  className={cn('absolute -right-1 top-0 flex h-8 w-2.5 cursor-pointer items-center justify-center rounded-sm text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-zinc-100 group-hover:opacity-100',
-                    menu?.id === g.id && 'opacity-100')}>
+                  className={cn('absolute -right-1 bottom-0 flex w-2.5 cursor-pointer items-center justify-center rounded-sm text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-zinc-100 group-hover:opacity-100',
+                    tinggiPanah, menu?.id === g.id && 'opacity-100')}>
                   <svg viewBox="0 0 6 10" width={5} height={9} aria-hidden><path d="M1 1l4 4-4 4" fill="none" stroke="currentColor" strokeWidth={1.4} /></svg>
                 </button>
               </>
@@ -423,9 +464,19 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
 
       <div className="my-1 h-px w-6 shrink-0 bg-zinc-800" />
 
+      {padat ? (
+        <button onClick={(e) => bukaMenu('setelan', e.currentTarget)} aria-pressed={setelanNyala}
+          title="Setelan gambar — magnet, tetap menggambar, kunci, sembunyikan"
+          className={cn(tombol, setelanNyala || menu?.id === 'setelan' ? nyala : biasa)}>
+          <Settings2 className="size-[17px]" strokeWidth={1.6} />
+          {!setelanNyala && (magnet !== 'mati' || tetap) && (
+            <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-emerald-400" />
+          )}
+        </button>
+      ) : (<>
       {/* Magnet: klik menyalakan/mematikan kekuatan terakhir; menu memilih
           lemah atau kuat. */}
-      <div className="group relative">
+      <div className="group relative shrink-0">
         <button onClick={() => ubah({ magnet: magnet === 'mati' ? magnetTerakhir : 'mati' })}
           title={magnet === 'mati' ? 'Magnet mati — titik gambar tidak menempel ke lilin'
             : magnet === 'lemah' ? 'Magnet lemah — menempel ke OHLC saat kursor dekat' : 'Magnet kuat — selalu menempel ke OHLC terdekat'}
@@ -435,8 +486,8 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
           {magnet === 'kuat' && <span className="absolute right-1 top-1 size-1.5 rounded-full bg-emerald-300" />}
         </button>
         <button data-bilah-panah onClick={(e) => bukaMenu('magnet', e.currentTarget)} title="Kekuatan magnet"
-          className={cn('absolute -right-1 top-0 flex h-8 w-2.5 cursor-pointer items-center justify-center rounded-sm text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-zinc-100 group-hover:opacity-100',
-            menu?.id === 'magnet' && 'opacity-100')}>
+          className={cn('absolute -right-1 top-0 flex w-2.5 cursor-pointer items-center justify-center rounded-sm text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-zinc-100 group-hover:opacity-100',
+            tinggiPanah, menu?.id === 'magnet' && 'opacity-100')}>
           <svg viewBox="0 0 6 10" width={5} height={9} aria-hidden><path d="M1 1l4 4-4 4" fill="none" stroke="currentColor" strokeWidth={1.4} /></svg>
         </button>
       </div>
@@ -456,15 +507,16 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
         className={cn(tombol, sembunyi ? nyala : biasa)}>
         {sembunyi ? <EyeOff className="size-[17px]" strokeWidth={1.6} /> : <Eye className="size-[17px]" strokeWidth={1.6} />}
       </button>
+      </>)}
       <button onClick={onHapus} disabled={!jumlahGambar && !adaPilihan}
         title={adaPilihan ? 'Hapus gambar terpilih (Delete)' : 'Hapus semua gambar di simbol ini (semua timeframe)'}
         className={cn(tombol, 'text-zinc-400 hover:bg-zinc-800/80 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-zinc-400')}>
         <Trash2 className="size-[17px]" strokeWidth={1.6} />
       </button>
 
-      <div className="min-h-2 flex-1" />
+      <div className={cn('flex-1', padat ? 'min-h-1' : 'min-h-2')} />
       <button onClick={() => setBuka(false)} title="Sembunyikan bilah alat gambar"
-        className={cn(tombol, 'size-7 shrink-0 text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300')}>
+        className={cn(tombol, sempit ? 'h-6 w-7' : 'size-7', 'text-zinc-600 hover:bg-zinc-800/80 hover:text-zinc-300')}>
         <ChevronsLeft className="size-3.5" />
       </button>
 
@@ -475,9 +527,36 @@ export function BilahGambar({ setelan, alat, onAlat, jumlahGambar, adaPilihan, o
         <div ref={menuRef} style={{ left: menu.x, top: menu.y }}
           className="fixed z-[80] min-w-[228px] overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 py-1 shadow-2xl shadow-black/50">
           <div className="px-3 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-500">
-            {menu.id === 'magnet' ? 'Magnet' : grupMenu?.judul}
+            {menu.id === 'magnet' ? 'Magnet' : menu.id === 'setelan' ? 'Setelan gambar' : grupMenu?.judul}
           </div>
-          {menu.id === 'magnet'
+          {menu.id === 'setelan' ? (
+            <>
+              {/* Magnet tiga pilihan dalam satu baris: yang dipilih langsung
+                  terlihat, tanpa menu kedua di dalam menu. */}
+              <div className="flex items-center gap-2.5 px-3 py-1.5">
+                <Magnet className={cn('size-4 shrink-0', magnet !== 'mati' ? 'text-emerald-300' : 'text-zinc-400')} strokeWidth={1.6} />
+                <span className="flex-1 text-[12.5px] text-zinc-200">Magnet</span>
+                <div className="flex overflow-hidden rounded-md border border-zinc-800">
+                  {(['mati', 'lemah', 'kuat'] as const).map((m) => (
+                    <button key={m} onClick={() => ubah(m === 'mati' ? { magnet: m } : { magnet: m, magnetTerakhir: m })}
+                      className={cn('cursor-pointer px-2 py-0.5 text-[11px] capitalize transition-colors',
+                        magnet === m ? 'bg-emerald-500/15 text-emerald-300' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100')}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <BarisSakelar aktif={tetap} onKlik={() => ubah({ tetap: !tetap })}
+                ikon={<PencilLine className="size-4 shrink-0" strokeWidth={1.6} />}
+                nama="Tetap menggambar" ket="Alat tidak dilepas sesudah satu gambar" />
+              <BarisSakelar aktif={kunci} onKlik={() => ubah({ kunci: !kunci })}
+                ikon={kunci ? <Lock className="size-4 shrink-0" strokeWidth={1.6} /> : <LockOpen className="size-4 shrink-0" strokeWidth={1.6} />}
+                nama="Kunci semua gambar" ket="Gambar tidak bisa dipilih atau digeser" />
+              <BarisSakelar aktif={sembunyi} onKlik={() => ubah({ sembunyi: !sembunyi })}
+                ikon={sembunyi ? <EyeOff className="size-4 shrink-0" strokeWidth={1.6} /> : <Eye className="size-4 shrink-0" strokeWidth={1.6} />}
+                nama="Sembunyikan gambar" ket={jumlahGambar ? jumlahGambar + ' gambar di simbol ini' : 'Belum ada gambar'} />
+            </>
+          ) : menu.id === 'magnet'
             ? ([['lemah', 'Magnet lemah', 'Menempel saat kursor dekat lilin'],
                 ['kuat', 'Magnet kuat', 'Selalu menempel ke OHLC terdekat']] as const).map(([m, nama, ket]) => (
                 <button key={m} onClick={() => { ubah({ magnet: m, magnetTerakhir: m }); setMenu(null); }}
