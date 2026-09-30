@@ -1153,7 +1153,9 @@ export default function ChartBacktest() {
       return;
     }
     if (!gambarAlat.length) return;
-    if (!confirm(`Hapus ${gambarAlat.length} gambar di ${simbol}? Berlaku di semua timeframe. Bisa diurungkan dengan Ctrl+Z.`)) return;
+    /* Tanpa dialog konfirmasi (diminta pemilik 30 Sep 2026): hapus semua
+       sudah bisa diurungkan dengan Ctrl+Z lewat catatRiwayat() di bawah,
+       jadi dialognya cuma langkah tambahan. */
     catatRiwayat();
     setGambarAlat([]);
     simpanAlat(simbol, []);
