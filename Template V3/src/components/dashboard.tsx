@@ -289,8 +289,16 @@ export function Dashboard() {
               <LineChart data={kurvaSaldo} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                 <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} />
-                <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
-                       tickFormatter={(v) => `$${v}`} domain={['dataMin - 10', 'dataMax + 10']} />
+                {/* Lebar 44 + angka mentah dua desimal ("$2132.85") memotong
+                    labelnya di tepi kiri panel (dilaporkan 30 Sep 2026).
+                    Saldo di sumbu cukup dolar bulat; angka persisnya ada di
+                    tooltip. Di atas $100k diringkas jadi "k" supaya tetap
+                    muat di lebar yang sama. */}
+                <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={58}
+                       tickFormatter={(v: number) => Math.abs(v) >= 100_000
+                         ? `$${Math.round(v / 1000)}k`
+                         : `$${Math.round(v).toLocaleString('en-US')}`}
+                       domain={['dataMin - 10', 'dataMax + 10']} />
                 <Tooltip content={<TipGrafik />} cursor={{ stroke: 'currentColor', strokeOpacity: 0.22 }} />
                 {/* Bulan lalu digambar DULU supaya garis bulan ini ada di
                     atasnya — yang sedang berjalan adalah yang dibaca. */}
