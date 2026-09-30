@@ -24,10 +24,14 @@ export interface KabarAgen {
   judul: string;
   detail: string;
   sumber: string;
-  jenis: 'sinyal' | 'pantau';
+  /** 'risiko' = pengingat batas trading dari penjaga-risiko.js di VPS,
+   *  hanya untuk pemilik (kabar pribadi). */
+  jenis: 'sinyal' | 'pantau' | 'risiko';
   pair: string;
   tautan: string;
   waktu: number;
+  /** Hanya pada jenis 'risiko'. */
+  level?: 'waspada' | 'bahaya';
 }
 
 function dasar(): string {
@@ -41,6 +45,19 @@ export function bacaTerakhirDibaca(): number {
 
 export function tandaiKabarDibaca(waktu: number) {
   try { localStorage.setItem(KUNCI_DIBACA, String(waktu)); } catch { /* privat */ }
+}
+
+/* ── PENGINGAT RISIKO YANG SUDAH DIAKUI ──────────────────────────────────
+   Penanda TERPISAH dari penanda baca lonceng. Membuka lonceng untuk membaca
+   kabar sinyal tidak boleh diam-diam menyatakan pengingat risiko sudah
+   dilihat kalau pop-upnya belum sempat tampil — dan sebaliknya, menekan
+   "Mengerti" di pop-up tidak menghapus tanda kabar sinyal. */
+const KUNCI_RISIKO = 'jt.risikoDiakui';
+export function bacaRisikoDiakui(): number {
+  try { return Number(localStorage.getItem(KUNCI_RISIKO)) || 0; } catch { return 0; }
+}
+export function simpanRisikoDiakui(waktu: number) {
+  try { localStorage.setItem(KUNCI_RISIKO, String(waktu)); } catch { /* privat */ }
 }
 
 export function useKabarAgen(): { kabar: KabarAgen[]; belum: number; tandai: () => void } {

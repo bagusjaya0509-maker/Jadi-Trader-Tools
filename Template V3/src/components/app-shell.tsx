@@ -6,7 +6,7 @@ import {
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
   PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign, Loader2,
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
-  Footprints,
+  Footprints, ShieldAlert,
   CheckCircle2,
   Sun, Moon, Gift } from 'lucide-react';
 import { IkonMasukan } from '@/components/ui/ikon-masukan';
@@ -17,7 +17,8 @@ import { TombolPasang } from '@/components/tombol-pasang';
 import { POLOS, dengarBus } from '@/lib/multi-chart';
 import { BADAN, WA_LINK } from '@/lib/badan';
 import { useAuth } from '@/lib/auth';
-import { useKabarAgen, umurKabar } from '@/lib/kabar';
+import { useKabarAgen, umurKabar, bacaRisikoDiakui, simpanRisikoDiakui } from '@/lib/kabar';
+import { PopupRisiko } from '@/components/popup-risiko';
 import { useKabarPribadi } from '@/lib/kabar-pribadi';
 import { MenuPengguna, PitaLangganan } from '@/components/gerbang';
 import { usePenutupLuar } from '@/lib/tutup-luar';
@@ -400,22 +401,48 @@ function Lonceng() {
   const agen = useKabarAgen();
 
   const totalBelum = belum + agen.belum;
-  const kabar = agen.kabar.slice(0, 8);
+  /* ── PENGINGAT RISIKO DIPISAH DARI KABAR AGEN ────────────────────────
+     Pengingat batas trading (penjaga-risiko.js) datang lewat rute yang
+     sama, tapi isinya bukan kejadian pasar — ia soal akun ini sendiri, dan
+     paling perlu ditindak. Jadi punya grupnya sendiri di PALING ATAS, dan
+     pop-up yang muncul sendiri. */
+  const risiko = agen.kabar.filter((k) => k.jenis === 'risiko').slice(0, 5);
+  const kabar = agen.kabar.filter((k) => k.jenis !== 'risiko').slice(0, 8);
+  const [diakui, setDiakui] = useState(bacaRisikoDiakui);
+  const risikoBaru = agen.kabar.filter((k) => k.jenis === 'risiko' && k.waktu > diakui);
+  const akuiRisiko = () => {
+    const paling = agen.kabar.reduce((m, k) => (k.jenis === 'risiko' ? Math.max(m, k.waktu) : m), 0);
+    if (paling > diakui) { setDiakui(paling); simpanRisikoDiakui(paling); }
+  };
+  /* Lencana merah kalau ada pengingat BAHAYA yang belum diakui; kuning
+     untuk yang lain. Angka yang sama, arti yang berbeda. */
+  const lencanaBahaya = risikoBaru.some((k) => k.level === 'bahaya');
 
   return (
     <div className="relative flex items-center" ref={ref}>
       <button
-        onClick={() => { setBuka((v) => !v); tandai(); agen.tandai(); }}
+        onClick={() => { setBuka((v) => !v); tandai(); agen.tandai(); akuiRisiko(); }}
         aria-label="Berita pasar & kabar agen"
         className="relative cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
       >
         <Bell className="size-[18px]" strokeWidth={1.8} />
         {totalBelum > 0 && (
-          <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-zinc-950">
+          /* text-[#fff] pada merah: alasan yang sama dengan lencana amplop —
+             skala zinc membalik di tema terang, merahnya tidak. */
+          <span className={cn('absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full text-[9px] font-bold',
+            lencanaBahaya ? 'bg-red-500 text-[#fff]' : 'bg-amber-500 text-zinc-950')}>
             {totalBelum}
           </span>
         )}
       </button>
+
+      {!buka && (
+        <PopupRisiko
+          daftar={risikoBaru}
+          akui={akuiRisiko}
+          bukaLonceng={() => { setBuka(true); tandai(); agen.tandai(); akuiRisiko(); }}
+        />
+      )}
 
       {buka && (
         <PanelKabar
@@ -424,6 +451,33 @@ function Lonceng() {
           ringkas="Kejadian pasar & sinyal agen"
           tutup={() => setBuka(false)}
         >
+          {risiko.length > 0 && (
+            <GrupKabar
+              ikon={<ShieldAlert className="size-3 text-amber-400" strokeWidth={2} />}
+              label="Batas risiko"
+            />
+          )}
+          {risiko.map((k, i) => (
+            <BarisKabar
+              key={k.id}
+              urutan={i}
+              warna={k.level === 'bahaya' ? 'merah' : 'kuning'}
+              ikon={k.level === 'bahaya'
+                ? <ShieldAlert className="size-4" strokeWidth={2} />
+                : <AlertTriangle className="size-4" strokeWidth={2} />}
+              tanda={k.level === 'bahaya' ? 'BAHAYA' : 'WASPADA'}
+              judul={k.judul}
+              detail={k.detail}
+              waktu={umurKabar(k.waktu)}
+              aksi={
+                <Link to="/chart-entry" onClick={() => setBuka(false)}
+                      className="inline-flex items-center gap-1 text-[11px] text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline">
+                  Lihat posisi <ChevronRight className="size-3" />
+                </Link>
+              }
+            />
+          ))}
+
           {kabar.length > 0 && (
             <GrupKabar
               ikon={<Radar className="size-3 text-red-400" strokeWidth={2} />}
@@ -433,7 +487,7 @@ function Lonceng() {
           {kabar.map((k, i) => (
             <BarisKabar
               key={k.id}
-              urutan={i}
+              urutan={risiko.length + i}
               warna={k.jenis === 'sinyal' ? 'hijau' : 'biru'}
               ikon={k.jenis === 'sinyal'
                 ? <Radar className="size-4" strokeWidth={2} />
@@ -477,7 +531,7 @@ function Lonceng() {
           {NEWS.map((n, i) => (
             <BarisKabar
               key={n.id}
-              urutan={kabar.length + i}
+              urutan={risiko.length + kabar.length + i}
               warna={n.dampak === 'tinggi' ? 'merah' : n.dampak === 'sedang' ? 'kuning' : 'netral'}
               ikon={n.dampak === 'tinggi'
                 ? <AlertTriangle className="size-4" strokeWidth={2} />
@@ -494,7 +548,7 @@ function Lonceng() {
           {/* Benar-benar kosong = belum ada kejadian pasar yang tercatat.
               Dikatakan apa adanya; kotak kosong tanpa kalimat terbaca
               seperti panel yang gagal memuat. */}
-          {kabar.length === 0 && NEWS.length === 0 && (
+          {risiko.length === 0 && kabar.length === 0 && NEWS.length === 0 && (
             <KosongKabar
               ikon={<Newspaper className="size-5" strokeWidth={1.6} />}
               judul="Belum ada kabar pasar"
