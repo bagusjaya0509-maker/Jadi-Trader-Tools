@@ -759,6 +759,20 @@ export async function tutupPosisiNyata(p: {
      sambil percaya posisinya sudah habis.
 
      Benderanya diteruskan supaya pemanggil bisa mengatakannya apa adanya. */
+  /* ── TABEL POSISI IKUT DIKABARI ─────────────────────────────────────
+     Dilaporkan pemilik 30 Sep 2026: "harus tutup 2 kali". Riwayat Binance
+     membantahnya — PUMPUSDT cuma punya SATU fill penutupan (07.25.39 WIB,
+     3660 penuh). Klik pertama selalu berhasil; yang tertinggal barisnya.
+
+     Panel Posisi Terbuka memakai usePosisiBinance() miliknya sendiri,
+     terpisah dari milik halaman Chart. `segarkanBursa()` sesudah tutup cuma
+     menyegarkan milik Chart, jadi baris di tabel bertahan sampai putaran
+     30 detik berikutnya. Tiga fungsi order lain sudah mengumumkan
+     perubahan; fungsi ini satu-satunya yang lupa. Klik kedua mengirim
+     MARKET reduceOnly ke posisi yang sudah nol — Binance menolaknya, jadi
+     tidak ada posisi baru yang terbuka — dan baris yang hilang tak lama
+     sesudahnya terbaca seolah klik kedua itulah yang berhasil. */
+  umumkanOrderBerubah();
   return { qty, penuh, kosong: j?.kosong === true };
 }
 
