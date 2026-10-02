@@ -1,5 +1,6 @@
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
+import { segarkanAkunMt5 } from '@/lib/akun';
 
 /* ════════════════════════════════════════════════════════════════════════
    ORDER MT5 LEWAT WEB — jalur perintah EA Trade-Fi Sync v2
@@ -53,16 +54,22 @@ export async function kirimPerintahMt5(p: PerintahMt5): Promise<{ id: string }> 
   return { id: String(j.id) };
 }
 
-/** Menjajaki nasib satu perintah. EA menjemput tiap 5 detik, jadi polling
- *  2 detik selama ±22 detik menutup kasus normalnya; lewat itu, jawabannya
- *  jujur: EA belum melapor — bukan pura-pura sukses. */
+/** Menjajaki nasib satu perintah. EA menjemput tiap 5 detik (v2.13), jadi
+ *  polling ±22 detik menutup kasus normalnya; lewat itu, jawabannya jujur:
+ *  EA belum melapor — bukan pura-pura sukses.
+ *
+ *  Dijajaki tiap 1 detik, bukan 2 (2 Okt 2026, keluhan "perubahan order
+ *  perlu 5 detikan"): selang 2 detik menambah sampai 2 detik di atas jeda
+ *  jemput EA, dan permintaan status ini ringan — cuma berjalan selama ada
+ *  yang menunggu hasil. */
 export async function tungguHasilMt5(id: string, batasDetik = 22): Promise<{ status: string; pesan: string }> {
   const u = auth.currentUser;
   if (!u) return { status: 'tak-diketahui', pesan: 'Sesi login habis.' };
   const token = await u.getIdToken();
   const mulai = Date.now();
+  let putaran = 0;
   for (;;) {
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, putaran++ === 0 ? 800 : 1000));
     try {
       const r = await fetch(`${dasar()}/api/mt5/perintah/status`, {
         headers: { Authorization: 'Bearer ' + token },
@@ -71,6 +78,18 @@ export async function tungguHasilMt5(id: string, batasDetik = 22): Promise<{ sta
       const p = (j?.perintah ?? []).find((x: { id: string }) => x.id === id) as
         { status: string; pesan?: string } | undefined;
       if (p && ['sukses', 'gagal', 'kedaluwarsa'].includes(p.status)) {
+        /* ── POSISI DIBACA ULANG BERTAHAP ──────────────────────────────
+           Server sudah menerapkan SL/TP baru begitu EA melapor sukses, jadi
+           bacaan seketika sudah benar. Dua bacaan susulan mengambil jurnal
+           EA yang datang sesudahnya — angka persis dari broker (dibulatkan
+           ke tick size) dan perubahan yang server tidak bisa tebak, seperti
+           sisa lot tutup sebagian atau tiket posisi yang baru dibuka.
+           Tanpa ini, angka final baru tampil pada putaran 30 detik. */
+        if (p.status === 'sukses') {
+          segarkanAkunMt5();
+          setTimeout(segarkanAkunMt5, 3500);
+          setTimeout(segarkanAkunMt5, 10_000);
+        }
         return { status: p.status, pesan: String(p.pesan || '') };
       }
     } catch { /* jaringan tersendat — coba lagi */ }
