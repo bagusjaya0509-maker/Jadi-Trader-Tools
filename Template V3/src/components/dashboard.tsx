@@ -131,8 +131,9 @@ export function Dashboard() {
 
      Sekarang: P/L terealisasi bulan kalender ini ÷ saldo awal bulan. Saldo
      awal bulan = saldo hari ini − P/L bulan ini, jangkar yang sama dengan
-     kurva "Saldo Bulan Ini" (lihat saldoDuaBulan), jadi kedua badge yang
-     bersebelahan memakai satu angka yang sama.
+     kurva "Saldo Bulan Ini" (lihat saldoDuaBulan). Dipakai badge panel Saldo
+     Bulan Ini; panel Hasil Trading Bulanan memakai persentase seumur akun
+     (`angka.tumbuh`).
 
      Bulan dicari lewat KUNCI kalender, bukan elemen terakhir `perBulan`:
      daftar itu berhenti di bulan transaksi terakhir, jadi tanpa transaksi
@@ -265,7 +266,12 @@ export function Dashboard() {
             sub={perBulan.length
               ? `Trade-Fi + Kripto digabung · ${perBulan.length} bulan dengan transaksi`
               : 'Belum ada transaksi.'}
-            kanan={trenBulan === null ? undefined : <BadgeTren nilai={trenBulan} />}
+            /* Persentase SEUMUR AKUN — angka yang sama dengan kartu hero di
+               halaman depan ("Perkembangan akun · sejak awal"), diminta
+               pemilik 2 Okt 2026. Panel ini menggambar beberapa bulan
+               sekaligus, jadi angka seumur akun yang cocok di sini; angka
+               bulan berjalan tinggal di panel Saldo Bulan Ini. */
+            kanan={angka.tumbuh === null ? undefined : <BadgeTren nilai={angka.tumbuh} />}
           />
           <div className="h-[220px] px-2 pb-4 sm:h-[260px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -298,8 +304,8 @@ export function Dashboard() {
             sub={adaBulanLalu
               ? 'Putih = bulan ini · abu putus-putus = bulan lalu pada tanggal yang sama.'
               : 'Saldo berjalan per tanggal. Bulan lalu belum ada transaksinya, jadi belum ada pembanding.'}
-            /* Angka yang sama dengan badge Hasil Trading Bulanan — lihat
-               `trenBulan`. `selisihSaldo` lama diukur dari titik tanggal 1,
+            /* Perkembangan saldo bulan berjalan — lihat `trenBulan`.
+               `selisihSaldo` lama diukur dari titik tanggal 1,
                yang sudah memuat P/L hari pertama, jadi P/L itu tidak pernah
                ikut terhitung. */
             kanan={trenBulan === null ? undefined : <BadgeTren nilai={trenBulan} />}
