@@ -101,7 +101,7 @@ export function Dashboard() {
   const {
     RIWAYAT, contoh, saldoAwal, stat, forex, kripto,
     mt5, binance, saldoForex, saldoKripto, totalSaldo, sumberSaldo,
-    kurvaSaldo, titikIni, adaBulanLalu, selisihSaldo, angka,
+    kurvaSaldo, adaBulanLalu, angka,
   } = useRingkasanAkun();
   const { data: posisiMentah, pending: pendingMentah, stop: stopKripto, contoh: kriptoContoh } = usePosisi();
   /* Harga bursa TIDAK diambil untuk data contoh: barisnya sudah membawa
@@ -121,12 +121,28 @@ export function Dashboard() {
      tetap menampilkan lima bulan riwayat yang tidak pernah terjadi. */
   const perBulan = useMemo(() => plPerBulan(RIWAYAT), [RIWAYAT]);
 
-  const bulanIni = perBulan[perBulan.length - 1];
-  const bulanLalu = perBulan[perBulan.length - 2];
-  /* Tanpa bulan pembanding, tren tidak bisa dihitung — dan menampilkan 0%
-     akan terbaca sebagai "tidak berubah", bukan "belum ada pembandingnya". */
-  const trenBulan = bulanIni && bulanLalu && Math.abs(bulanLalu.pnl) > 0.005
-    ? Number((((bulanIni.pnl - bulanLalu.pnl) / Math.abs(bulanLalu.pnl)) * 100).toFixed(1))
+  /* ── PERKEMBANGAN SALDO BULAN INI, DARI P/L ──────────────────────────
+     Diganti 2 Okt 2026 atas permintaan pemilik. Dulu badge ini membandingkan
+     P/L bulan ini dengan bulan lalu: (Okt − Sep) ÷ |Sep|. Oktober −$5,33
+     terhadap September ±−$380 menghasilkan "↗ 98,6%" hijau — benar secara
+     hitungan, tapi terbaca sebagai untung besar padahal bulannya masih minus,
+     dan bulan yang baru berjalan dua hari hampir selalu "membaik" terhadap
+     bulan penuh.
+
+     Sekarang: P/L terealisasi bulan kalender ini ÷ saldo awal bulan. Saldo
+     awal bulan = saldo hari ini − P/L bulan ini, jangkar yang sama dengan
+     kurva "Saldo Bulan Ini" (lihat saldoDuaBulan), jadi kedua badge yang
+     bersebelahan memakai satu angka yang sama.
+
+     Bulan dicari lewat KUNCI kalender, bukan elemen terakhir `perBulan`:
+     daftar itu berhenti di bulan transaksi terakhir, jadi tanpa transaksi
+     bulan ini elemen terakhirnya adalah bulan lalu. */
+  const kini = new Date();
+  const kunciKini = `${kini.getFullYear()}-${String(kini.getMonth() + 1).padStart(2, '0')}`;
+  const plBulanIni = perBulan.find((b) => b.kunci === kunciKini)?.pnl ?? 0;
+  const saldoAwalBulan = totalSaldo - plBulanIni;
+  const trenBulan = saldoAwalBulan > 0
+    ? Number(((plBulanIni / saldoAwalBulan) * 100).toFixed(1))
     : null;
 
   const POSISI_MT5 = mt5.posisi;
@@ -282,7 +298,11 @@ export function Dashboard() {
             sub={adaBulanLalu
               ? 'Putih = bulan ini · abu putus-putus = bulan lalu pada tanggal yang sama.'
               : 'Saldo berjalan per tanggal. Bulan lalu belum ada transaksinya, jadi belum ada pembanding.'}
-            kanan={titikIni.length > 1 ? <BadgeTren nilai={Number(selisihSaldo.toFixed(1))} /> : undefined}
+            /* Angka yang sama dengan badge Hasil Trading Bulanan — lihat
+               `trenBulan`. `selisihSaldo` lama diukur dari titik tanggal 1,
+               yang sudah memuat P/L hari pertama, jadi P/L itu tidak pernah
+               ikut terhitung. */
+            kanan={trenBulan === null ? undefined : <BadgeTren nilai={trenBulan} />}
           />
           <div className="h-[220px] px-2 pb-4 sm:h-[260px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
