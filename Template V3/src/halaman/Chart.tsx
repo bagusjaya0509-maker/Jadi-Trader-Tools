@@ -1443,6 +1443,13 @@ export default function ChartBacktest() {
 
     setSuntingSibuk(true);
     setSuntingKabar('Mengirim perubahan…');
+    /* Level broker sebelum dikirim — untuk geserRencanaIkutPosisi. MT5
+       dibaca dari laporan terbaru, bukan dari `sunting` yang dipotret saat
+       panelnya dibuka. */
+    const levelLama = sunting.pasar === 'mt5'
+      ? (akunMt5.posisi.find((x) => x.tiket === sunting.tiket)
+        ?? akunMt5.pending.find((x) => x.tiket === sunting.tiket) ?? null)
+      : { sl: sunting.sl, tp: sunting.tp };
     /* Ditulis di sini, dibaca sesudah `finally` — lihat catatannya di
        ujung fungsi ini. */
     let tuntas = false;
@@ -1586,7 +1593,10 @@ export default function ChartBacktest() {
        `setPanelUbah(false)` langsung, BUKAN `tutupPanelUbah()`: yang kedua
        mengembalikan isian ke nilai broker yang lama, dan itu perilaku
        "batal" — kebalikan dari yang baru saja berhasil dikirim. */
-    if (tuntas) { setPanelUbah(false); setSuntingKabar(''); }
+    if (tuntas) {
+      setPanelUbah(false); setSuntingKabar('');
+      geserRencanaIkutPosisi(levelLama, { sl: slBaru, tp: tpBaru });
+    }
   }
 
   /* Batalkan pending / tutup posisi. Dipisah dari kirimSunting karena
@@ -2343,12 +2353,18 @@ ${pnlSunting !== null
   /* Seretan SL/TP posisi baru BERANGKAT saat tombol Kirim di chart
      ditekan — ChartLilin yang memegang pratinjau dan tombolnya, jalur
      kirimnya sama dengan order BUKA: antrean perintah → EA → laporan. */
+  /* Nilai broker SEBELUM dikirim, untuk geserRencanaIkutPosisi. Lewat ref
+     karena callback di bawah sengaja tidak punya dependensi. */
+  const posisiMt5Ref = useRef(akunMt5.posisi);
+  posisiMt5Ref.current = akunMt5.posisi;
   const ubahPosisiMt5 = useCallback(async (tiket: string, sl: number, tp: number): Promise<boolean> => {
     try {
       setKabarNyata(`Mengirim SL/TP baru #${tiket} ke EA…`);
+      const lama = posisiMt5Ref.current.find((x) => x.tiket === tiket);
       const { id } = await kirimPerintahMt5({ aksi: 'UBAH', tiket, sl, tp });
       const h = await tungguHasilMt5(id);
       const sukses = h.status === 'sukses';
+      if (sukses) geserRencanaIkutPosisi(lama, { sl, tp });
       setKabarNyata(sukses ? `SL/TP #${tiket} terpasang di MT5 — ${h.pesan}` : `Ubahan #${tiket}: ${h.pesan}`);
       /* LAPORAN BARU DIMINTA, BUKAN DITUNGGU.
          ──────────────────────────────────────────────────────────────
@@ -2502,6 +2518,33 @@ ${pnlSunting !== null
      jadi menggeser garis di chart adalah cara mengubah level, bukan sekadar
      hiasan yang terpisah dari kotak isian. */
   const [rencana, setRencana] = useState<{ entry?: number; sl?: number; tp?: number }>({});
+
+  /* ── RENCANA IKUT POSISI YANG DIA LAHIRKAN ──────────────────────────────
+     Dilaporkan pemilik 2 Okt 2026: sesudah TP posisi Trade-Fi digeser dan
+     berhasil, "masih ada bekas TP yang lama di web", dan baru hilang
+     sesudah refresh. Bekas itu garis RENCANA tiket: sesudah order dikirim,
+     garis rencananya sengaja ditinggal di level yang sama untuk menyusun
+     layer berikutnya, dan angkanya di sumbu disembunyikan selama ia kembar
+     dengan garis posisi broker. Begitu TP posisi pindah, TP rencana tetap
+     di level lama — angkanya muncul lagi dan terbaca sebagai TP yang
+     belum terganti.
+
+     Yang digeser HANYA level rencana yang sama dengan level LAMA posisi
+     itu (artinya rencana itulah asal posisinya). Rencana di level lain —
+     layer berikutnya yang sedang disusun — tidak disentuh. Dideklarasikan
+     dengan `function` supaya ikut terangkat ke atas: dipakai juga oleh
+     useCallback yang ditulis sebelum baris ini. */
+  function geserRencanaIkutPosisi(lama: { sl: number; tp: number } | null | undefined,
+                                  baru: { sl: number; tp: number }) {
+    if (!lama) return;
+    const dekat = (a: number | undefined, b: number) =>
+      !!a && b > 0 && Math.abs(a - b) <= Math.max(Math.abs(b) * 1e-5, 1e-9);
+    setRencana((r) => {
+      const sl = baru.sl > 0 && dekat(r.sl, lama.sl) ? baru.sl : r.sl;
+      const tp = baru.tp > 0 && dekat(r.tp, lama.tp) ? baru.tp : r.tp;
+      return sl === r.sl && tp === r.tp ? r : { ...r, sl, tp };
+    });
+  }
 
   /* ── Level yang datang dari halaman Copy Signal ───────────────────────
      `#/chart?simbol=BTCUSDT&tf=4h&arah=SELL&entry=63707&sl=64080&tp=62484`
