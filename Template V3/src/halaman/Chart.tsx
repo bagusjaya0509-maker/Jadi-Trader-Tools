@@ -2680,7 +2680,19 @@ ${pnlSunting !== null
     try {
       const t = JSON.parse(sessionStorage.getItem(KUNCI_TIKET) ?? 'null');
       if (!t || t.simbol !== simbol) return;
-      if (t.rencana && (t.rencana.entry || t.rencana.sl || t.rencana.tp)) {
+      /* ── RENCANA DIPULIHKAN HANYA BERSAMA TIKETNYA ─────────────────────
+         Dilaporkan pemilik 2 Okt 2026: garis TP order yang sudah lama
+         terkirim tetap ada walau halamannya di-refresh. Catatan di atas
+         keliru soal satu hal — sessionStorage TIDAK hilang saat halaman
+         disegarkan di tab yang sama. Jadi rencana sisa order yang sudah
+         berangkat dipulihkan, lalu langsung disimpan lagi oleh efek di
+         bawah, dan hidup terus.
+
+         Yang layak diselamatkan adalah tiket yang SEDANG DISUSUN (ada
+         arahnya). Rencana tanpa tiket adalah sisa order terkirim atau
+         usulan kartu screener — yang kedua dipasang ulang dari alamat. */
+      const adaTiket = t.draf === 'BUY' || t.draf === 'SELL';
+      if (adaTiket && t.rencana && (t.rencana.entry || t.rencana.sl || t.rencana.tp)) {
         setRencana(t.rencana);
         entryDigeser.current = true;   // level pulihan adalah keputusan, bukan tebakan
       }
@@ -2695,7 +2707,8 @@ ${pnlSunting !== null
     /* Hanya menyimpan kalau memang ADA yang disusun. Menulis objek kosong
        tiap render membuat penyegaran halaman memulihkan "tidak ada apa-apa"
        dan menimpa tiket yang masih hidup di tab lain. */
-    const adaIsi = !!draf || !!(rencana.entry || rencana.sl || rencana.tp);
+    /* Hanya selagi TIKET terbuka — lihat catatan pemulihan di atas. */
+    const adaIsi = !!draf;
     try {
       if (adaIsi) {
         sessionStorage.setItem(KUNCI_TIKET, JSON.stringify({
@@ -3828,10 +3841,23 @@ ${pnlSunting !== null
       const r = x / acuanSkala;
       return r > 0.1 && r < 10 ? x : undefined;
     };
+    /* ── MT5 REAL: SESUDAH JADI ORDER, GARIS BROKER YANG BICARA ──────────
+       Rencana dipertahankan sesudah order berangkat supaya levelnya tidak
+       hilang di sela kirim dan laporan pertama. Di MT5 sela itu kini
+       sedetik-dua, dan sesudahnya garis posisi broker (ChartLilin) yang
+       menggambar entry/SL/TP sesungguhnya. Rencana yang tetap digambar
+       malah jadi garis HANTU: SL/TP diubah dari terminal, atau posisinya
+       kena SL/TP, dan level lamanya masih berdiri di chart (dilaporkan
+       pemilik 2 Okt 2026). Levelnya tetap di state — menekan BUY/SELL lagi
+       untuk layer berikutnya memunculkannya kembali. */
+    const rencanaJadiPosisiMt5 = !draf && rencanaTerkirim.current
+      && aksi?.mode === 'real' && simbol.startsWith('MT5:');
     const sumber = aksiPosisi
       ? { entry: aksiPosisi.masuk, sl: aksiPosisi.sl, tp: aksiPosisi.tp }
       : aksiTunda
       ? { entry: aksiTunda.entry, sl: aksiTunda.sl, tp: aksiTunda.tp }
+      : rencanaJadiPosisiMt5
+      ? { entry: undefined, sl: undefined, tp: undefined }
       : { entry: seSkala(rencana.entry), sl: seSkala(rencana.sl), tp: seSkala(rencana.tp) };
     const kunci = !!aksiPosisi || !!aksiTunda;
     const g: GarisSeret[] = [];
