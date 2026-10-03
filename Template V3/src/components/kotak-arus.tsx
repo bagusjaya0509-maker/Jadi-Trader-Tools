@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, Trash2 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, tanggalPendek } from '@/lib/utils';
-import { simpanArus, hapusArus, arusBersih, type Arus } from '@/lib/tulis-jurnal';
+import { simpanArus, hapusArus, arusBersih, arusItuContoh, type Arus } from '@/lib/tulis-jurnal';
 import { tulisLatar } from '@/lib/tulis-lokal';
 import type { Sumber } from '@/data/contoh';
 
@@ -47,6 +47,10 @@ export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
   }, [pesan]);
 
   const milikku = arus.filter((a) => a.sumber === sumber);
+  /* Baris contoh tidak punya dokumen di Firestore. Isiannya tetap hidup —
+     setoran pertama yang dicatat orangnya langsung menggantikan contohnya
+     (lihat `pilihArus`) — tapi tombol hapus barisnya dimatikan. */
+  const contoh = arusItuContoh(arus);
   const bersih = arusBersih(arus, sumber);
   const totalSetor = milikku.filter((a) => a.jenis === 'setor').reduce((s, a) => s + a.nilai, 0);
   const totalTarik = milikku.filter((a) => a.jenis === 'tarik').reduce((s, a) => s + a.nilai, 0);
@@ -165,7 +169,8 @@ export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
                     {a.jenis === 'setor' ? '+' : '−'}{uang(a.nilai)}
                   </span>
                   <button onClick={() => { if (confirm('Hapus catatan ini?')) void hapusArus(a.id); }}
-                          disabled={!bisaTulis} aria-label="Hapus"
+                          disabled={!bisaTulis || contoh} aria-label="Hapus"
+                          title={contoh ? 'Baris contoh — hilang sendiri begitu kamu mencatat setoran pertamamu' : undefined}
                           className="cursor-pointer rounded p-1 text-zinc-700 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:opacity-40">
                     <Trash2 className="size-3.5" />
                   </button>

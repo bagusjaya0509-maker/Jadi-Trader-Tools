@@ -4,11 +4,12 @@
    Semua angka di prototipe ini datang dari SATU berkas, supaya tidak ada dua
    layar yang menampilkan saldo berbeda untuk hal yang sama.
 
-   Besarannya sengaja diambil dari data aslimu (saldo awal $359, Forex 29
-   trade, Kripto 94 trade, gabungan −$38,07) — bukan angka bulat karangan.
-   Alasannya bukan kerapian: layout yang hanya pernah diuji dengan "$1.000,00"
-   akan patah begitu bertemu "$0,0006404" atau "−$305,46", dan itu baru
-   ketahuan setelah tersambung data nyata.
+   Saldo awalnya ($359) diambil dari data aslimu, dan besaran tiap transaksi
+   sengaja tidak bulat. Alasannya bukan kerapian: layout yang hanya pernah
+   diuji dengan "$1.000,00" akan patah begitu bertemu "$0,0006404" atau
+   "−$305,46", dan itu baru ketahuan setelah tersambung data nyata.
+
+   Riwayatnya sendiri DIBANGKITKAN — setahun penuh, lihat `buatRiwayat`.
 
    TIDAK ADA jaringan di sini. Tidak ada Firebase, tidak ada Binance, tidak
    ada VPS — sesuai permintaan, ini murni tampilan.
@@ -94,62 +95,264 @@ export function bursaPosisi(venue: Posisi['venue']): 'binance' | 'hyperliquid' |
 }
 
 const HARI = 86_400_000;
+const JAM = 3_600_000;
+const MENIT = 60_000;
 const skrg = Date.now();
 
-/* ── Riwayat ──────────────────────────────────────────────────────────────
-   Dibuat deterministik (bukan Math.random) supaya tampilan tidak berubah
-   tiap refresh — perubahan acak membuat mustahil menilai apakah sebuah
-   perbedaan visual itu perbaikan atau kebetulan. */
-function buatRiwayat(): Trade[] {
-  const pairForex = ['XAUUSDc', 'EURUSD', 'GBPUSD', 'USDJPY'];
-  const pairKripto = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'ADAUSDT', 'XAUTUSDT', 'AAPLUSDT'];
-  const emosi = ['Tenang', 'FOMO', 'Sabar', 'Ragu', 'Percaya diri', 'Balas dendam'];
-  const alasan = ['BOS Parallel Channel', 'Sentuh SNR H4', 'News JC', 'SMI Oversold', 'Retest Supply', 'Iseng entry'];
+/* ── Riwayat: SATU TAHUN PENUH, sampai jam ini ────────────────────────────
+   Diminta pemilik 3 Okt 2026: "data mode preview di dashboard, journal dan
+   personal area itu datanya di setiap panelnya berisi lengkap selama 1
+   tahun penuh". Yang dilihatnya sebelum itu: kalender bulan berjalan
+   kosong, Pola Emosi kosong, winrate 82% di sebelah P/L minus, dan saldo
+   kripto negatif.
 
+   Dua sebabnya, dan dua-duanya di sini:
+
+   · Contoh lama cuma 123 transaksi dalam dua bulan terakhir, dan sengaja
+     dirancang RUGI (meniru angka akun pemilik waktu itu).
+   · Mode preview lalu menimpanya dengan 150 transaksi ASLI pemilik dari
+     public/ringkasanAkun — dua minggu terakhir, tanpa emosi, tanpa setup,
+     tanpa setoran. Statistik yang dihitung dari potongan 150 baris sebuah
+     akun berisi ribuan baris tidak menggambarkan akun mana pun.
+
+   Sekarang contohnya dibangkitkan: 12 bulan penuh ditambah bulan berjalan,
+   tiap hari, dua jurnal. TIDAK ADA jaringan — satu-satunya masukan dari
+   luar adalah jam.
+
+   ── DETERMINISTIK PER TANGGAL KALENDER ────────────────────────────────
+   Benih acaknya tanggal itu sendiri (20261003), bukan urutan hari sejak
+   awal. Jadi 14 Maret selalu berisi transaksi yang sama, siapa pun yang
+   membuka dan kapan pun: menyegarkan halaman tidak mengubah apa pun, dan
+   besok yang bertambah cuma hari barunya. Transaksi hari ini muncul satu
+   per satu mengikuti jam — contoh yang sudah memuat transaksi pukul 21.00
+   padahal baru pukul 10.00 ketahuan karangan dalam sekali lihat.
+
+   ── BUKAN AKUN YANG MENANG TERUS ──────────────────────────────────────
+   `SUASANA_*` membuat beberapa bulan merah (dan bulannya berbeda untuk
+   Trade-Fi dan Kripto, supaya dua jurnalnya tidak kembar). Emosi ikut
+   menentukan hasil lewat `WATAK`: FOMO, serakah, dan balas dendam lebih
+   sering kalah DAN kalahnya lebih besar. Itu yang membuat panel Pola Emosi
+   dan Evaluasi punya sesuatu untuk dikatakan — jurnal yang isinya
+   kemenangan semua tidak memperlihatkan gunanya jurnal.
+
+   ── ID-NYA `s-…`, BUKAN `fx-…`/`cr-…` ─────────────────────────────────
+   Transaksi hasil migrasi V2 milik pemilik memakai id `fx-12`, `cr-40`.
+   Contoh lama memakai id yang sama persis; yang baru sengaja tidak, supaya
+   tidak ada satu jalur pun — sunting, impor, hapus — tempat sebuah baris
+   contoh bisa menunjuk dokumen sungguhan. */
+
+/** Acak berbenih (mulberry32): benih sama, deret sama.
+ *  Diekspor karena catatan kas contoh (data/kas-contoh.ts) memakainya juga —
+ *  dua pembangkit acak di dua berkas contoh pasti berselisih pelan-pelan. */
+export function acakBerbenih(benih: number): () => number {
+  let a = benih >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+type Bobot<T> = readonly (readonly [T, number])[];
+
+function pilihBerbobot<T>(r: () => number, daftar: Bobot<T>): T {
+  let x = r() * daftar.reduce((s, d) => s + d[1], 0);
+  for (const [nilai, bobot] of daftar) { x -= bobot; if (x < 0) return nilai; }
+  return daftar[daftar.length - 1][0];
+}
+
+/* Geseran peluang menang per bulan kalender (indeks 0 = Januari). */
+const SUASANA_FOREX  = [0.06, -0.12, 0.04, 0.07, -0.03, 0.00, 0.07, -0.14, 0.05, 0.04, 0.06, -0.06];
+const SUASANA_KRIPTO = [-0.05, -0.06, 0.07, 0.02, 0.06, -0.11, 0.05, -0.04, -0.02, 0.05, 0.08, -0.08];
+
+/* Kosakatanya SAMA dengan menu emosi di modal trade (EMOSI_MASUK) — contoh
+   yang memakai kata lain akan memperlihatkan pilihan yang tidak bisa
+   dipilih orangnya sendiri. */
+interface Watak { p: number; rugi: number; untung: number; alasan?: string }
+const WATAK: Record<string, Watak> = {
+  'Tenang':       { p:  0.07, rugi: 0.95, untung: 1.10 },
+  'Percaya Diri': { p:  0.03, rugi: 1.00, untung: 1.05 },
+  'Netral':       { p:  0.00, rugi: 1.00, untung: 1.00 },
+  'Ragu-ragu':    { p: -0.05, rugi: 1.00, untung: 0.70 },
+  'FOMO':         { p: -0.15, rugi: 1.25, untung: 0.90, alasan: 'Kejar harga, tanpa retest' },
+  'Serakah':      { p: -0.10, rugi: 1.40, untung: 1.15, alasan: 'Tambah posisi di luar rencana' },
+  'Balas Dendam': { p: -0.20, rugi: 1.55, untung: 0.85, alasan: 'Masuk lagi setelah rugi' },
+};
+const EMOSI_BIASA: Bobot<string> = [
+  ['Tenang', 34], ['Percaya Diri', 22], ['Netral', 14], ['Ragu-ragu', 12], ['FOMO', 11], ['Serakah', 7],
+];
+/* Di bulan yang berat orangnya lebih sering terpancing — dan itu yang
+   membuat bulan merahnya merah, bukan sekadar sial. */
+const EMOSI_BURUK: Bobot<string> = [
+  ['Tenang', 22], ['Percaya Diri', 16], ['Netral', 12], ['Ragu-ragu', 16], ['FOMO', 20], ['Serakah', 14],
+];
+
+const JUMLAH_FOREX: Bobot<number> = [[0, 10], [1, 48], [2, 30], [3, 12]];
+const JUMLAH_KRIPTO: Bobot<number> = [[0, 11], [1, 43], [2, 31], [3, 12], [4, 3]];
+
+/* [nama, lot terkecil x100, lot terbesar x100] */
+const PAIR_FOREX: Bobot<readonly [string, number, number]> = [
+  [['XAUUSDc', 1, 2], 46], [['EURUSD', 2, 5], 20], [['GBPUSD', 2, 4], 14],
+  [['USDJPY', 2, 5], 11], [['USDCAD', 2, 4], 5], [['GBPJPY', 1, 3], 4],
+];
+/* [nama, kira-kira harganya] — harga cuma dipakai menurunkan jumlah koin
+   dari nilai order, supaya kolom ukuran tidak berisi angka mustahil. */
+const PAIR_KRIPTO: Bobot<readonly [string, number]> = [
+  [['BTCUSDT', 84570], 26], [['ETHUSDT', 2677], 19], [['SOLUSDT', 119.4], 16],
+  [['XRPUSDT', 1.489], 8], [['BNBUSDT', 767], 7], [['DOGEUSDT', 0.0931], 7],
+  [['LINKUSDT', 13.99], 6], [['SUIUSDT', 1.156], 5], [['ADAUSDT', 0.246], 4], [['XAUTUSDT', 4149], 2],
+];
+const LEVERAGE: Bobot<number> = [[5, 2], [10, 4], [20, 3], [25, 1]];
+
+const SETUP_FOREX = [
+  'Sentuh SNR H4', 'BOS Parallel Channel', 'Retest Supply H1', 'Retest Demand H1',
+  'Breakout channel + retest', 'Momentum candle M15', 'Rilis berita AS',
+];
+/* Gap cuma ada sesudah pasar tutup akhir pekan. Setup "GAP awal pekan" di
+   hari Rabu adalah jenis kesalahan yang langsung dikenali orang yang
+   memang trading — dan sesudah itu ia tidak percaya baris lainnya. */
+const SETUP_FOREX_SENIN = [...SETUP_FOREX, 'GAP awal pekan', 'GAP awal pekan'];
+const SETUP_KRIPTO = [
+  'SNR H4 + SMI oversold', 'SNR H4 + SMI overbought', 'Sinyal prioritas screener', 'BOS Parallel Channel',
+  'Retest Demand 4H', 'Retest Supply 4H', 'Breakout bervolume', 'Copy sinyal analis',
+];
+
+/* Risiko per transaksi dalam dolar — kira-kira setengah persen dari akun
+   contohnya. Dijaga kecil dengan sengaja: 900 transaksi setahun dengan
+   risiko 2% per transaksi menghasilkan kurva yang tidak dipunyai siapa pun. */
+const RISIKO_FOREX = 1.9;
+const RISIKO_KRIPTO = 2.6;
+
+function isiHari(out: Trade[], sumber: Sumber, d: Date) {
+  const fx = sumber === 'forex';
+  const th = d.getFullYear(), bl = d.getMonth(), tg = d.getDate();
+  const cap = th * 10000 + (bl + 1) * 100 + tg;
+  const r = acakBerbenih(cap * (fx ? 31 : 37) + (fx ? 7 : 11));
+  const awalHari = new Date(th, bl, tg).getTime();
+  const suasana = (fx ? SUASANA_FOREX : SUASANA_KRIPTO)[bl];
+  const n = pilihBerbobot(r, fx ? JUMLAH_FOREX : JUMLAH_KRIPTO);
+
+  /* Trade-Fi mulai di sesi London/New York (sore–malam WIB); kripto
+     sepanjang hari. */
+  let jam = fx ? 13.5 + r() * 2.5 : 7.5 + r() * 5;
+  let rugiTadi = false, waktuTadi = 0;
+
+  for (let i = 0; i < n; i++) {
+    /* Balas dendam hanya bisa lahir sesudah rugi, dan masuknya cepat —
+       beberapa menit sesudah yang rugi ditutup. Jarak itu yang dibaca panel
+       Evaluasi ("masuk lagi <15 menit setelah rugi"), jadi emosi dan
+       angkanya menceritakan hal yang sama. */
+    const balas = rugiTadi && r() < 0.22;
+    const emosi = balas ? 'Balas Dendam' : pilihBerbobot(r, suasana < -0.05 ? EMOSI_BURUK : EMOSI_BIASA);
+    const w = WATAK[emosi];
+    const waktu = Math.round(balas
+      ? waktuTadi + (4 + r() * 9) * MENIT
+      : awalHari + Math.min(jam, 23.4) * JAM + r() * 30 * MENIT);
+
+    const risiko = (fx ? RISIKO_FOREX : RISIKO_KRIPTO) * (0.85 + r() * 0.3);
+    const peluang = Math.min(0.88, Math.max(0.12, (fx ? 0.56 : 0.52) + suasana + w.p));
+    const menang = r() < peluang;
+    /* Tidak semua menang penuh dan tidak semua kalah penuh: sebagian
+       ditutup lebih awal — untung tipis, atau rugi yang dipotong sebelum
+       menyentuh stop. Tanpa itu semua kerugian nyaris seragam, dan
+       jurnal sungguhan tidak pernah serapi itu. */
+    const besar = menang
+      ? risiko * (r() < 0.14 ? 0.2 + r() * 0.4 : 0.8 + r() * 1.1) * w.untung
+      : risiko * (r() < 0.12 ? 0.25 + r() * 0.3 : 0.65 + r() * 0.6) * w.rugi;
+    const pnl = Number((menang ? besar : -besar).toFixed(2));
+    const arah = r() < (fx ? 0.5 : 0.56) ? 'BUY' : 'SELL';
+    const setup = fx ? (d.getDay() === 1 ? SETUP_FOREX_SENIN : SETUP_FOREX) : SETUP_KRIPTO;
+    const alasan = w.alasan && r() < 0.7 ? w.alasan : setup[Math.floor(r() * setup.length)];
+    const id = `${fx ? 's-fx' : 's-cr'}-${cap}-${i}`;
+
+    if (fx) {
+      const [pair, lotMin, lotMaks] = pilihBerbobot(r, PAIR_FOREX);
+      const lot = (lotMin + Math.floor(r() * (lotMaks - lotMin + 1))) / 100;
+      out.push({ id, pair, arah, lot, pnl, waktu, sumber, emosi, alasan });
+    } else {
+      const [pair, harga] = pilihBerbobot(r, PAIR_KRIPTO);
+      /* Nilai order diturunkan dari P/L-nya: hasil $4 dari gerak 1,3%
+         berarti ordernya sekitar $300. Dibalik begini supaya kolom Size
+         Order dan kolom P/L tidak pernah saling membantah. */
+      const gerak = 0.006 + r() * 0.016;
+      const nilaiOrder = Math.min(1500, Math.max(60, Math.round(Math.abs(pnl) / gerak / 10) * 10));
+      const leverage = pilihBerbobot(r, LEVERAGE);
+      const lot = Number((nilaiOrder / harga).toPrecision(3));
+      out.push({ id, pair, arah, lot, pnl, waktu, sumber, emosi, alasan, nilaiOrder, leverage });
+    }
+
+    jam += 1.2 + r() * 2.6;
+    rugiTadi = !menang;
+    waktuTadi = waktu;
+  }
+}
+
+/** Tanggal 1, dua belas bulan sebelum bulan berjalan. Dipakai pembangkit
+ *  riwayat DAN setoran contoh — keduanya harus berangkat dari hari yang
+ *  sama, kalau tidak setoran pertamanya jatuh sebelum transaksi pertama. */
+function awalContoh(): number {
+  const kini = new Date(skrg);
+  return new Date(kini.getFullYear(), kini.getMonth() - 12, 1).getTime();
+}
+
+function buatRiwayat(): Trade[] {
   const out: Trade[] = [];
-  // 29 trade forex, total ≈ −17,16
-  for (let i = 0; i < 29; i++) {
-    const menang = i % 5 !== 0 && i % 7 !== 0;
-    const besar = 4 + ((i * 37) % 90) / 10;
-    out.push({
-      id: `fx-${i}`,
-      pair: pairForex[i % pairForex.length],
-      arah: i % 3 === 0 ? 'SELL' : 'BUY',
-      lot: Number((0.01 + ((i * 3) % 7) / 100).toFixed(2)),
-      pnl: Number((menang ? besar : -besar * 1.35).toFixed(2)),
-      waktu: skrg - (60 - i * 2) * HARI,
-      sumber: 'forex',
-      emosi: emosi[i % emosi.length],
-      alasan: alasan[i % alasan.length],
-    });
+  for (let d = new Date(awalContoh()); d.getTime() <= skrg;
+       d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+    /* MetaTrader tutup Sabtu–Minggu; kripto tidak pernah tutup. */
+    if (d.getDay() !== 0 && d.getDay() !== 6) isiHari(out, 'forex', d);
+    isiHari(out, 'kripto', d);
   }
-  // 94 trade kripto, total ≈ −20,92
-  for (let i = 0; i < 94; i++) {
-    const menang = i % 5 === 0 || i % 3 === 0;
-    const besar = 1.2 + ((i * 53) % 70) / 10;
-    out.push({
-      id: `cr-${i}`,
-      pair: pairKripto[i % pairKripto.length],
-      arah: i % 2 === 0 ? 'BUY' : 'SELL',
-      lot: Number((0.001 + ((i * 11) % 40) / 1000).toFixed(3)),
-      pnl: Number((menang ? besar : -besar * 1.42).toFixed(2)),
-      waktu: skrg - (48 - i * 0.5) * HARI,
-      sumber: 'kripto',
-      emosi: emosi[(i + 2) % emosi.length],
-      alasan: alasan[(i + 3) % alasan.length],
-    });
-  }
-  return out.sort((a, b) => a.waktu - b.waktu);
+  /* Hari ini dibangkitkan utuh lalu dipotong di jam sekarang — bukan
+     dibangkitkan sebagian — supaya transaksi pagi tidak berubah saat sore. */
+  return out.filter((t) => t.waktu <= skrg).sort((a, b) => a.waktu - b.waktu);
 }
 
 export const RIWAYAT: Trade[] = buatRiwayat();
 
-export const POSISI_TERBUKA: Posisi[] = [
-  { id: 'p1', simbol: 'BTCUSDT',  arah: 'BUY',  tf: '4H', entry: 64065.10, sl: 63277.00, tp: 65182.00, hargaKini: 64784.50, venue: 'Binance Live', buka: skrg - 5 * 3600_000 },
-  { id: 'p2', simbol: 'ADAUSDT',  arah: 'BUY',  tf: '4H', entry: 0.1622,   sl: 0.1606,   tp: 0.1653,   hargaKini: 0.1985,    venue: 'Binance Live', buka: skrg - 26 * 3600_000 },
-  { id: 'p3', simbol: 'XAUTUSDT', arah: 'SELL', tf: '4H', entry: 4400.00,  sl: 4460.00,  tp: 4280.00,  hargaKini: 4329.51,   venue: 'Simulasi',     buka: skrg - 9 * 3600_000 },
-  { id: 'p4', simbol: 'XAUUSDc',  arah: 'BUY',  tf: '1H', entry: 1925.40,  sl: 1918.00,  tp: 1941.00,  hargaKini: 1928.02,   venue: 'MT5',          buka: skrg - 3 * 3600_000 },
-];
+/* ── Setoran & penarikan CONTOH ──────────────────────────────────────────
+   Tanpa ini jurnal kripto contoh bermodal $0: kurvanya "dari $0,00",
+   lencana persennya tidak pernah tergambar, dan kotak Setoran & Penarikan
+   kosong — tiga dari keluhan "angkanya seperti tidak lengkap".
+
+   ── KENAPA DI SINI, BUKAN DI useArusKas ───────────────────────────────
+   Pernah ditaruh di hook itu selama satu rilis, dan akibatnya saldo
+   Dashboard naik $1.800 untuk SETIAP akun yang belum pernah mencatat
+   setoran (catatannya masih ada di lib/tulis-jurnal.ts). Hook itu tidak
+   tahu apakah riwayat yang sedang tampil contoh atau sungguhan.
+
+   Yang tahu adalah `useRiwayat().contoh`, jadi pemasangannya di dua
+   pembaca yang memegang bendera itu (lib/ringkasan.ts dan halaman Jurnal),
+   dengan satu aturan: arus contoh HANYA menemani riwayat contoh. Begitu
+   satu transaksi sungguhan masuk, keduanya lenyap bersama. */
+export interface ArusContoh {
+  id: string; sumber: Sumber; jenis: 'setor' | 'tarik';
+  nilai: number; waktu: number; catatan: string;
+}
+
+export const ARUS_CONTOH: ArusContoh[] = ([
+  { id: 'contoh-arus-1', sumber: 'kripto', jenis: 'setor', nilai: 500, hari: 0,   jam: 9,  catatan: 'Modal awal Binance Futures' },
+  { id: 'contoh-arus-2', sumber: 'forex',  jenis: 'setor', nilai: 200, hari: 76,  jam: 10, catatan: 'Top up akun MT5' },
+  { id: 'contoh-arus-3', sumber: 'kripto', jenis: 'setor', nilai: 250, hari: 141, jam: 20, catatan: 'Top up dari gaji' },
+  { id: 'contoh-arus-4', sumber: 'forex',  jenis: 'tarik', nilai: 100, hari: 248, jam: 11, catatan: 'Tarik profit ke bank' },
+  { id: 'contoh-arus-5', sumber: 'kripto', jenis: 'tarik', nilai: 120, hari: 305, jam: 19, catatan: 'Tarik profit' },
+] as const).map(({ hari, jam, ...a }) => ({ ...a, waktu: awalContoh() + hari * HARI + jam * JAM }))
+  .sort((a, b) => b.waktu - a.waktu);
+
+/** Saldo MetaTrader contoh = saldo awal + setoran bersih + P/L jurnal
+ *  Trade-Fi contoh.
+ *
+ *  DIHITUNG, bukan ditulis. Dulu `AKUN_MT5_CONTOH.saldo` angka mati
+ *  ($528,39) di sebelah jurnal yang menghitung $358, dan kartunya menulis
+ *  "Selisih broker vs jurnal +$169,66" — untuk akun yang dua angkanya
+ *  sama-sama karangan. Sekarang keduanya satu bilangan. */
+export const SALDO_FOREX_CONTOH = Number((
+  SALDO_AWAL
+  + ARUS_CONTOH.filter((a) => a.sumber === 'forex').reduce((s, a) => s + (a.jenis === 'setor' ? a.nilai : -a.nilai), 0)
+  + RIWAYAT.filter((t) => t.sumber === 'forex').reduce((s, t) => s + t.pnl, 0)
+).toFixed(2));
 
 /* ── Posisi & order kripto untuk PENGUNJUNG ──────────────────────────────
    Dipakai `usePosisi()` saat tidak ada sesi sama sekali. Bukan hiasan:
@@ -159,24 +362,31 @@ export const POSISI_TERBUKA: Posisi[] = [
    di kenyataan, tapi timpang di layar, terbaca sebagai fitur yang belum jadi.
 
    ANGKANYA SALING COCOK dan itu syarat, bukan kerapian: pnlFloat tiap baris
-   = (hargaKini − entry) x jumlah, jadi kolom Gerak, P/L, Risk SL, dan
-   Target TP semuanya berangkat dari bilangan yang sama. Layar yang angkanya
-   tidak berjumlah ketahuan karangan dalam sepuluh detik.
+   = (hargaKini − entry) x jumlah (dibalik untuk SELL), jadi kolom Gerak,
+   P/L, Risk SL, dan Target TP semuanya berangkat dari bilangan yang sama.
+   Layar yang angkanya tidak berjumlah ketahuan karangan dalam sepuluh detik.
 
    Satu posisi MERAH disengaja. Tiga baris hijau bukan etalase, itu iklan —
-   dan orang yang paham pasar langsung tahu angkanya disetel. */
+   dan orang yang paham pasar langsung tahu angkanya disetel.
+
+   Harganya diambil dari pasar 3 Okt 2026 (BTC 84,5 ribu, SOL 119). Contoh
+   yang entry-nya BTC 64 ribu terbaca seperti tangkapan layar lama.
+
+   `POSISI_TERBUKA` yang dulu ada di atas blok ini dibuang: satu-satunya
+   pemakainya nilai awal `usePosisi`, dan nilai awal berisi contoh adalah
+   cara contoh menyamar jadi posisi sungguhan — lihat catatan di sana. */
 export const POSISI_KRIPTO_CONTOH: Posisi[] = [
-  { id: 'c-btc', simbol: 'BTCUSDT', arah: 'BUY',  tf: '4H', entry: 64065.10, sl: 63277.00, tp: 65182.00, hargaKini: 64784.50, venue: 'Binance Live', buka: skrg - 5 * 3600_000,  jumlah: 0.0182, pnlFloat: 13.09 },
-  { id: 'c-sol', simbol: 'SOLUSDT', arah: 'BUY',  tf: '4H', entry: 75.0500,  sl: 72.4000,  tp: 81.6000,  hargaKini: 77.8200,  venue: 'Binance Live', buka: skrg - 19 * 3600_000, jumlah: 4.62,   pnlFloat: 12.80 },
-  { id: 'c-ada', simbol: 'ADAUSDT', arah: 'BUY',  tf: '1H', entry: 0.16220,  sl: 0.15600,  tp: 0.17400,  hargaKini: 0.15940,  venue: 'Binance Live', buka: skrg - 2 * 86_400_000, jumlah: 1240,  pnlFloat: -3.47 },
+  { id: 'c-btc',  simbol: 'BTCUSDT',  arah: 'BUY',  tf: '4H', entry: 83420.00, sl: 82300.00, tp: 86400.00, hargaKini: 84570.20, venue: 'Binance Live', buka: skrg - 5 * JAM,  jumlah: 0.006, pnlFloat: 6.90 },
+  { id: 'c-sol',  simbol: 'SOLUSDT',  arah: 'BUY',  tf: '4H', entry: 116.2000, sl: 113.4000, tp: 124.8000, hargaKini: 119.3800, venue: 'Binance Live', buka: skrg - 19 * JAM, jumlah: 2.6,   pnlFloat: 8.27 },
+  { id: 'c-link', simbol: 'LINKUSDT', arah: 'SELL', tf: '1H', entry: 13.8200,  sl: 14.1500,  tp: 13.1000,  hargaKini: 13.9880,  venue: 'Binance Live', buka: skrg - 2 * HARI, jumlah: 21,    pnlFloat: -3.53 },
 ];
 
 /* Bentuknya `OrderBursa` — SAMA PERSIS dengan jawaban /api/open-orders,
    supaya panel tidak perlu tahu ini contoh dan tidak ada cabang tampilan
    kedua yang bisa berselisih dengan yang asli. */
 export const PENDING_KRIPTO_CONTOH: OrderBursa[] = [
-  { id: 'c-o1', simbol: 'LINKUSDT', jenis: 'ENTRY', tipe: 'LIMIT', arah: 'BUY',  pemicu: 0, harga: 13.8500, qty: 24.5, algo: false, dibuat: skrg - 4 * 3600_000 },
-  { id: 'c-o2', simbol: 'AVAXUSDT', jenis: 'ENTRY', tipe: 'STOP',  arah: 'SELL', pemicu: 26.4000, harga: 26.4000, qty: 12.8, algo: true, dibuat: skrg - 13 * 3600_000 },
+  { id: 'c-o1', simbol: 'ETHUSDT',  jenis: 'ENTRY', tipe: 'LIMIT', arah: 'BUY',  pemicu: 0, harga: 2610.00, qty: 0.12, algo: false, dibuat: skrg - 4 * JAM },
+  { id: 'c-o2', simbol: 'AVAXUSDT', jenis: 'ENTRY', tipe: 'STOP',  arah: 'SELL', pemicu: 10.6000, harga: 10.6000, qty: 28, algo: true, dibuat: skrg - 13 * JAM },
 ];
 
 /* SL/TP pending SENGAJA order tersendiri, bukan field pada order entry-nya.
@@ -184,10 +394,10 @@ export const PENDING_KRIPTO_CONTOH: OrderBursa[] = [
    contoh yang menyederhanakannya akan membuat panel menampilkan bentuk yang
    tidak pernah ada di akun sungguhan. */
 export const STOP_KRIPTO_CONTOH: OrderBursa[] = [
-  { id: 'c-s1', simbol: 'LINKUSDT', jenis: 'SL', tipe: 'STOP_MARKET',         arah: 'SELL', pemicu: 13.3200, harga: 0, qty: 24.5, algo: true, dibuat: skrg - 4 * 3600_000 },
-  { id: 'c-s2', simbol: 'LINKUSDT', jenis: 'TP', tipe: 'TAKE_PROFIT_MARKET',  arah: 'SELL', pemicu: 15.1000, harga: 0, qty: 24.5, algo: true, dibuat: skrg - 4 * 3600_000 },
-  { id: 'c-s3', simbol: 'AVAXUSDT', jenis: 'SL', tipe: 'STOP_MARKET',         arah: 'BUY',  pemicu: 27.2500, harga: 0, qty: 12.8, algo: true, dibuat: skrg - 13 * 3600_000 },
-  { id: 'c-s4', simbol: 'AVAXUSDT', jenis: 'TP', tipe: 'TAKE_PROFIT_MARKET',  arah: 'BUY',  pemicu: 24.7000, harga: 0, qty: 12.8, algo: true, dibuat: skrg - 13 * 3600_000 },
+  { id: 'c-s1', simbol: 'ETHUSDT',  jenis: 'SL', tipe: 'STOP_MARKET',         arah: 'SELL', pemicu: 2548.00, harga: 0, qty: 0.12, algo: true, dibuat: skrg - 4 * JAM },
+  { id: 'c-s2', simbol: 'ETHUSDT',  jenis: 'TP', tipe: 'TAKE_PROFIT_MARKET',  arah: 'SELL', pemicu: 2760.00, harga: 0, qty: 0.12, algo: true, dibuat: skrg - 4 * JAM },
+  { id: 'c-s3', simbol: 'AVAXUSDT', jenis: 'SL', tipe: 'STOP_MARKET',         arah: 'BUY',  pemicu: 11.0500, harga: 0, qty: 28, algo: true, dibuat: skrg - 13 * JAM },
+  { id: 'c-s4', simbol: 'AVAXUSDT', jenis: 'TP', tipe: 'TAKE_PROFIT_MARKET',  arah: 'BUY',  pemicu: 9.8000,  harga: 0, qty: 28, algo: true, dibuat: skrg - 13 * JAM },
 ];
 
 /* ── Sinyal untuk layar Screener ──────────────────────────────────────── */

@@ -74,13 +74,16 @@ export function bawaan(): IsiPorto {
    ia selalu menampilkan "riwayat bulanan mulai terisi begitu ada dua bulan
    tercatat" — satu-satunya kotak kosong yang tersisa di Personal Area.
 
+   Tiga belas titik: dua belas bulan penuh ditambah bulan berjalan (dulu
+   delapan; diminta pemilik 3 Okt 2026 supaya contohnya setahun penuh).
+
    Ini SENGAJA tidak masuk ke `bawaan()`. Fungsi itu dipakai tombol "Isi
    dari daftar bawaan", yang MENULIS ke Firestore akun orang; menuliskan
-   delapan bulan riwayat yang tidak pernah ia jalani berarti menaruh
+   setahun riwayat yang tidak pernah ia jalani berarti menaruh
    kebohongan di data miliknya sendiri, dan besok ia akan membacanya
    sebagai fakta. Contoh hanya boleh hidup di lapisan tampilan.
 
-   Angkanya naik dengan DUA bulan turun. Kurva yang naik mulus setiap bulan
+   Angkanya naik dengan TIGA bulan turun. Kurva yang naik mulus setiap bulan
    tidak pernah terjadi pada portofolio siapa pun, dan orang yang mengerti
    akan langsung tahu grafiknya disetel. */
 function bulananContoh(): Record<string, number> {
@@ -89,7 +92,10 @@ function bulananContoh(): Record<string, number> {
      titik terakhir grafik akan bertentangan dengan kartu KPI di atasnya —
      dan selisih yang tidak bisa dijelaskan lebih merusak kepercayaan
      daripada panel yang kosong. */
-  const nilai = [71_400_000, 76_850_000, 82_300_000, 79_100_000, 88_600_000, 93_250_000, 91_800_000, 104_908_780];
+  const nilai = [
+    58_900_000, 62_350_000, 66_100_000, 64_200_000, 69_800_000, 71_400_000, 76_850_000,
+    82_300_000, 79_100_000, 88_600_000, 93_250_000, 91_800_000, 104_908_780,
+  ];
   const out: Record<string, number> = {};
   const skrg = new Date();
   nilai.forEach((v, i) => {

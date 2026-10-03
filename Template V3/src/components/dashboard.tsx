@@ -21,6 +21,7 @@ import { PanelEvaluasi } from '@/components/panel-evaluasi';
 import { TabelPosisi } from '@/components/tabel-posisi';
 import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
 import { bacaSpekMt5 } from '@/lib/pasar';
+import { AKUN_MT5_CONTOH, SPEK_MT5_CONTOH } from '@/lib/contoh-pratinjau';
 import { simbolDasarMt5 } from '@/lib/simbol';
 
 /* Risiko & target dalam DOLAR — rumus yang SAMA dengan panel Posisi Terbuka
@@ -147,6 +148,14 @@ export function Dashboard() {
     : null;
 
   const POSISI_MT5 = mt5.posisi;
+  /* Dolar per 1 lot per 1,0 gerak harga. Aslinya dikirim EA dan disimpan
+     `bacaSpekMt5`; akun CONTOH tidak punya EA, jadi kolom Risk SL dan
+     Target TP-nya dulu selalu "—" di sebelah panel kripto yang terisi
+     penuh. Cadangannya HANYA berlaku kalau yang sedang tampil memang objek
+     akun contoh itu sendiri — akun sungguhan tanpa spek tetap "—", karena
+     menebak ukuran kontrak broker orang berarti mengarang angka risikonya. */
+  const spekMt5 = (simbol: string) =>
+    bacaSpekMt5(simbolDasarMt5(simbol)) ?? (mt5 === AKUN_MT5_CONTOH ? SPEK_MT5_CONTOH[simbol] ?? 0 : 0);
   const pnlMt5 = POSISI_MT5.reduce((s, p) => s + p.profit, 0);
   /* null = tidak ada satu pun posisi yang membawa PnL dari bursa. Menjumlahkan
      `undefined` jadi 0 akan menampilkan "$0,00" — angka yang terbaca sebagai
@@ -178,8 +187,8 @@ export function Dashboard() {
      Sekarang jadwal PERTAMA yang menang dan tidak pernah diganggu; nilai
      terbarunya dijemput dari ref saat ia meletus. Hasilnya sama-sama satu
      tulisan per dua detik, bedanya yang ini benar-benar terjadi. */
-  const bahanTerbit = useRef<{ r: typeof angka; trade: typeof RIWAYAT } | null>(null);
-  bahanTerbit.current = { r: angka, trade: RIWAYAT };
+  const bahanTerbit = useRef<{ r: typeof angka } | null>(null);
+  bahanTerbit.current = { r: angka };
   const jamTerbit = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -198,7 +207,7 @@ export function Dashboard() {
       const sidik = JSON.stringify(b.r);
       if (sidik === sidikTerbit.current) return;
       sidikTerbit.current = sidik;
-      void terbitkanRingkasan(b.r, b.trade).catch((e) => console.warn('ringkasan tidak terbit:', e));
+      void terbitkanRingkasan(b.r).catch((e) => console.warn('ringkasan tidak terbit:', e));
     }, 2000);
   }, [pemilik, RIWAYAT.length, contoh, angka]);
 
@@ -490,10 +499,8 @@ export function Dashboard() {
                 hargaKini: p.hargaKini,
                 sl: p.sl, tp: p.tp,
                 pnl: p.profit,
-                risikoUsd: uangDariJarak(p.sl > 0 ? Math.abs(p.hargaBuka - p.sl) : 0,
-                  (bacaSpekMt5(simbolDasarMt5(p.simbol)) ?? 0) * p.lot),
-                imbalUsd: uangDariJarak(p.tp > 0 ? Math.abs(p.tp - p.hargaBuka) : 0,
-                  (bacaSpekMt5(simbolDasarMt5(p.simbol)) ?? 0) * p.lot),
+                risikoUsd: uangDariJarak(p.sl > 0 ? Math.abs(p.hargaBuka - p.sl) : 0, spekMt5(p.simbol) * p.lot),
+                imbalUsd: uangDariJarak(p.tp > 0 ? Math.abs(p.tp - p.hargaBuka) : 0, spekMt5(p.simbol) * p.lot),
                 ket: `#${p.tiket}`,
               }))}
             />

@@ -1,5 +1,9 @@
 import type { StatusAkun, PosisiBroker, PendingBroker } from '@/lib/akun';
 import type { Performa, PerformaAnalis } from '@/lib/analisa';
+/* `data/contoh.ts` tidak mengimpor apa pun saat berjalan (cuma tipe), jadi
+   mengambil dari sana tidak menyeret Firestore ke bundel awal — berkas ini
+   dipakai `lib/akun.ts`, yang ikut dimuat halaman depan. */
+import { SALDO_FOREX_CONTOH } from '@/data/contoh';
 
 /* ════════════════════════════════════════════════════════════════════════
    DATA PRATINJAU — isi yang dilihat orang sebelum punya data sendiri
@@ -42,27 +46,50 @@ export const SEKARANG_CONTOH = Date.now();
    karena ia butuh MetaTrader hidup DAN EA terpasang. Pengunjung yang
    belum punya keduanya melihat kotak kosong bertuliskan $0.00, dan itu
    satu-satunya kesan yang ia bawa tentang fitur Trade-Fi. */
+/* Harga dari pasar 3 Okt 2026 (emas 4.149, EURUSD 1,1251), dan lot-nya
+   sebesar yang dipakai riwayat contohnya: risiko beberapa dolar per posisi.
+   Profit tiap baris = selisih harga x lot x ukuran kontrak (emas 100,
+   forex 100.000) — dihitung, bukan dikira-kira, karena kolom Gerak dan
+   kolom P/L di tabelnya berangkat dari bilangan yang sama.
+
+   Satu posisi merah, sengaja: lihat catatan di kepala berkas. */
 const POSISI_MT5: PosisiBroker[] = [
-  { tiket: '51884213', simbol: 'XAUUSDc', arah: 'BUY',  lot: 0.04, hargaBuka: 1921.35, hargaKini: 1928.02, sl: 1913.80, tp: 1939.50, profit: 26.68, waktuBuka: SEKARANG_CONTOH - 7 * JAM },
-  { tiket: '51884190', simbol: 'EURUSD',  arah: 'SELL', lot: 0.10, hargaBuka: 1.08420, hargaKini: 1.08267, sl: 1.08760, tp: 1.07850, profit: 15.30, waktuBuka: SEKARANG_CONTOH - 19 * JAM },
-  { tiket: '51883977', simbol: 'USDJPY',  arah: 'BUY',  lot: 0.06, hargaBuka: 147.220, hargaKini: 146.985, sl: 146.700, tp: 148.400, profit: -9.58, waktuBuka: SEKARANG_CONTOH - 2 * HARI },
+  { tiket: '51884213', simbol: 'XAUUSDc', arah: 'BUY',  lot: 0.01, hargaBuka: 4141.30, hargaKini: 4149.20, sl: 4134.50, tp: 4162.00, profit: 7.90,  waktuBuka: SEKARANG_CONTOH - 7 * JAM },
+  { tiket: '51884190', simbol: 'EURUSD',  arah: 'SELL', lot: 0.03, hargaBuka: 1.12740, hargaKini: 1.12510, sl: 1.12960, tp: 1.12180, profit: 6.90,  waktuBuka: SEKARANG_CONTOH - 19 * JAM },
+  { tiket: '51883977', simbol: 'GBPUSD',  arah: 'BUY',  lot: 0.02, hargaBuka: 1.28790, hargaKini: 1.28610, sl: 1.28540, tp: 1.29400, profit: -3.60, waktuBuka: SEKARANG_CONTOH - 2 * HARI },
 ];
 
 const PENDING_MT5: PendingBroker[] = [
-  { tiket: '51884402', simbol: 'XAUUSDc', jenis: 'SELL_LIMIT', arah: 'SELL', lot: 0.04, harga: 1942.00, sl: 1949.50, tp: 1926.00, waktu: SEKARANG_CONTOH - 3 * JAM },
-  { tiket: '51884377', simbol: 'GBPUSD',  jenis: 'BUY_STOP',   arah: 'BUY',  lot: 0.08, harga: 1.27340, sl: 1.26900, tp: 1.28200, waktu: SEKARANG_CONTOH - 11 * JAM },
+  { tiket: '51884402', simbol: 'XAUUSDc', jenis: 'SELL_LIMIT', arah: 'SELL', lot: 0.01, harga: 4172.00, sl: 4180.50, tp: 4150.00, waktu: SEKARANG_CONTOH - 3 * JAM },
+  { tiket: '51884377', simbol: 'USDCAD',  jenis: 'BUY_STOP',   arah: 'BUY',  lot: 0.03, harga: 1.34250, sl: 1.33900, tp: 1.35000, waktu: SEKARANG_CONTOH - 11 * JAM },
 ];
+
+const MENGAMBANG_MT5 = POSISI_MT5.reduce((s, p) => s + p.profit, 0);
+
+/** Dolar per 1 lot per 1,0 gerak harga, untuk simbol akun CONTOH di atas —
+ *  bilangan yang sama dengan yang dipakai menghitung `profit` tiap barisnya.
+ *  Akun sungguhan mendapat angka ini dari EA-nya (`bacaSpekMt5`); yang ini
+ *  cuma boleh dipakai saat yang tampil memang `AKUN_MT5_CONTOH`. */
+export const SPEK_MT5_CONTOH: Record<string, number> = {
+  XAUUSDc: 100, EURUSD: 100_000, GBPUSD: 100_000,
+};
 
 /** Akun MT5 contoh.
  *
  *  `terhubung: false` DISENGAJA dan tidak boleh diubah jadi true. Panel
  *  membaca bendera itu untuk memutuskan menampilkan lencana tersambung —
  *  dan lencana tersambung yang tidak benar adalah cara tercepat membuat
- *  orang menutup MetaTrader-nya sambil merasa aman. */
+ *  orang menutup MetaTrader-nya sambil merasa aman.
+ *
+ *  Saldonya `SALDO_FOREX_CONTOH` — bilangan yang SAMA dengan hitungan
+ *  jurnal Trade-Fi contoh, dan ekuitasnya saldo itu ditambah P/L mengambang
+ *  di atas. Dulu dua angka mati ($528,39 / $560,79) yang tidak cocok dengan
+ *  jurnalnya, jadi kartu saldo menulis "Selisih broker vs jurnal +$169,66"
+ *  untuk akun yang dua-duanya karangan. */
 export const AKUN_MT5_CONTOH: StatusAkun = {
   terhubung: false,
-  saldo: 528.39,
-  ekuitas: 560.79,
+  saldo: SALDO_FOREX_CONTOH,
+  ekuitas: Number((SALDO_FOREX_CONTOH + MENGAMBANG_MT5).toFixed(2)),
   mataUang: 'USD',
   ket: 'Data contoh — sambungkan MetaTrader 5 untuk melihat akunmu',
   posisi: POSISI_MT5,
@@ -130,28 +157,14 @@ export const PERFORMA_CONTOH: Performa = {
   ],
 };
 
-/* ── Aktivitas Dashboard ─────────────────────────────────────────────────
-   Kolom Activity yang cuma berisi dua baris membuat panelnya terlihat
-   separuh jadi. Yang ditulis di sini jenis kejadian yang memang muncul
-   di pemakaian nyata — order terkirim, TP kena, SL kena, EA melapor —
-   supaya orang bisa menebak apa yang akan ia lihat nanti. */
-export interface AktivitasContoh {
-  id: string;
-  teks: string;
-  waktu: number;
-  jenis: 'order' | 'tutup' | 'sistem';
-}
-
-export const AKTIVITAS_CONTOH: AktivitasContoh[] = [
-  { id: 'a1', jenis: 'order',  teks: 'Posisi XAUUSDc BUY 0,04 terbuka di MetaTrader 5',   waktu: SEKARANG_CONTOH - 7 * JAM },
-  { id: 'a2', jenis: 'tutup',  teks: 'SOLUSDT BUY ditutup TP1 +$14,20',                    waktu: SEKARANG_CONTOH - 11 * JAM },
-  { id: 'a3', jenis: 'order',  teks: 'Sell Limit XAUUSDc dipasang di 1942,00',             waktu: SEKARANG_CONTOH - 3 * JAM },
-  { id: 'a4', jenis: 'tutup',  teks: 'ETHUSDT SELL ditutup SL −$9,80',                     waktu: SEKARANG_CONTOH - 1 * HARI },
-  { id: 'a5', jenis: 'sistem', teks: 'EA JadiTraderSync v2.07 melapor — 3 posisi terbuka', waktu: SEKARANG_CONTOH - 2 * JAM },
-  { id: 'a6', jenis: 'tutup',  teks: 'BTCUSDT BUY ditutup TP2 +$31,05',                    waktu: SEKARANG_CONTOH - 2 * HARI },
-  { id: 'a7', jenis: 'order',  teks: 'Posisi ADAUSDT BUY terbuka di Binance Live',          waktu: SEKARANG_CONTOH - 3 * HARI },
-  { id: 'a8', jenis: 'tutup',  teks: 'XAUUSDc SELL ditutup manual +$4,60',                  waktu: SEKARANG_CONTOH - 4 * HARI },
-];
+/* ── Aktivitas Dashboard: TIDAK ADA daftar contohnya di sini ─────────────
+   Pernah ada (`AKTIVITAS_CONTOH`, delapan baris tulisan tangan), dan tidak
+   pernah dipakai siapa pun: kolom Activity di Dashboard dirakit dari
+   kejadian yang memang ada di data — transaksi terakhir yang ditutup dan
+   posisi yang sedang terbuka. Di mode preview bahan itu riwayat contoh
+   dan posisi contoh, jadi kolomnya terisi sendiri dan isinya cocok dengan
+   tabel di sebelahnya. Daftar kedua yang ditulis tangan cuma akan
+   berselisih dengan itu. */
 
 /* ── DI MANA DATA PRATINJAU KRIPTO TINGGAL ───────────────────────────────
    Posisi, pending, dan stop kripto untuk pengunjung ada di

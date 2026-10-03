@@ -80,9 +80,11 @@ export function SpandukContoh({ contoh, riwayat = [] }: { contoh: boolean; riway
     try {
       if (apa === 'impor') {
         const n = await imporContoh(pengguna.uid);
-        setKabar(`${n} transaksi contoh masuk ke jurnalmu. Angka di seluruh halaman ikut terisi.`);
+        setKabar(`${n} transaksi contoh (60 hari terakhir) masuk ke jurnalmu. Angka di seluruh halaman ikut terisi.`);
       } else {
-        await hapusImporContoh(pengguna.uid);
+        /* `riwayat` — jurnal yang sedang termuat — yang menentukan apa
+           yang dihapus, bukan contoh hari ini. Lihat hapusImporContoh. */
+        await hapusImporContoh(pengguna.uid, riwayat);
         simpanPilihanContoh(pengguna.uid, 'kosong');
         setKabar('Data contoh dihapus. Jurnalmu kembali kosong.');
       }
@@ -121,7 +123,7 @@ export function SpandukContoh({ contoh, riwayat = [] }: { contoh: boolean; riway
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-sky-500/25 bg-sky-500/[0.05] px-4 py-3">
       <span className="text-[12.5px] text-sky-200/90">
         Akunmu masih kosong, jadi halaman ini menampilkan <b>data contoh</b> dulu.
-        Mau disalin jadi milikmu supaya bisa diutak-atik?
+        Mau dua bulan terakhirnya disalin jadi milikmu supaya bisa diutak-atik?
       </span>
       <span className="ml-auto flex items-center gap-3">
         {kabar && <span className="text-[11.5px] text-sky-200/70">{kabar}</span>}

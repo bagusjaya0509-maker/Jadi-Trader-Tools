@@ -277,6 +277,21 @@ export function useAkunMt5(): StatusAkun {
       return;
     }
 
+    /* ── AKUN CONTOH DIBUANG BEGITU ADA YANG MASUK ───────────────────────
+       Orang yang masuk TANPA memuat ulang halaman (melihat preview, lalu
+       menekan Masuk) masih memegang akun contoh di state ini sampai server
+       menjawab — dan `gagalLunak` di bawah sengaja menahan keadaan lama
+       selama tiga kegagalan beruntun, jadi backend yang sedang tersendat
+       membiarkan saldo contoh ($600-an) dan tiga posisi contoh tampil
+       sebagai milik orangnya sampai semenit lebih. Untuk pemilik lebih
+       buruk: Dashboard menerbitkan Total Saldo ke halaman depan, dan saldo
+       contoh ikut terjumlah di dalamnya.
+
+       Jadi dikosongkan DI SINI, sebelum pemeriksaan pertama: "Memeriksa…"
+       jujur soal ketidaktahuannya. Saldo sungguhan yang sudah ada tidak
+       disentuh — yang diganti hanya objek contoh itu sendiri. */
+    setSt((s) => (s === AKUN_MT5_CONTOH ? BELUM : s));
+
     /* Kegagalan TUNGGAL (kuota Google cegukan, jaringan tersendat, server
        baru restart) TIDAK mengosongkan panel — posisi yang berkedip
        hilang-muncul tiap 30 detik jauh lebih menyesatkan daripada angka

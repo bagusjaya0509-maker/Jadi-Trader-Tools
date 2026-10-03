@@ -8,7 +8,7 @@ import { alasanJurnal, emosiJurnal } from '@/lib/medan-jurnal';
 import { useAuth } from '@/lib/auth';
 import { usePosisiBinance, type OrderBursa } from '@/lib/admin';
 import {
-  RIWAYAT, POSISI_TERBUKA, SALDO_AWAL, PRODUK,
+  RIWAYAT, SALDO_AWAL, PRODUK,
   POSISI_KRIPTO_CONTOH, PENDING_KRIPTO_CONTOH, STOP_KRIPTO_CONTOH,
   type Trade, type Posisi, type Sumber, type Produk,
 } from '@/data/contoh';
@@ -134,7 +134,25 @@ export interface HasilData<T> {
  *  mengurutkannya sendiri (kurvaEkuitas sudah melakukannya). */
 export function useRiwayat(): HasilData<Trade[]> {
   const { pengguna, memuat: memuatAuth } = useAuth();
-  const [data, setData] = useState<Trade[]>(RIWAYAT);
+  /* ── KEADAAN AWALNYA KOSONG, BUKAN DATA CONTOH ───────────────────────
+     Dulu `useState(RIWAYAT)`. Untuk pengunjung itu tidak berbahaya. Untuk
+     yang SUDAH masuk, ada sela antara "sesinya pulih" dan "Firestore
+     menjawab" — dan di sela itu hook ini memulangkan transaksi contoh
+     dengan `contoh: false`. Layar mana pun yang membacanya memperlakukan
+     baris karangan sebagai jurnal pemiliknya:
+
+       · Dashboard menerbitkan ringkasan ke halaman depan 2 detik sesudah
+         dibuka. Di sambungan lambat (Firestore > 2 detik) yang terbit
+         adalah winrate dan saldo CONTOH, sebagai rekam jejak sungguhan.
+       · Sinkron otomatis jurnal menghitung jendela tarikannya dari
+         transaksi terbaru — yang saat itu transaksi contoh hari ini.
+
+     Ditemukan 3 Okt 2026 saat menyiapkan contoh setahun (949 baris, jauh
+     lebih meyakinkan daripada 123 baris lama — jadi bocornya pun akan jauh
+     lebih sulit dikenali). Contoh sekarang cuma punya SATU jalan keluar:
+     cabang `pakaiContoh` di ujung fungsi ini, yang selalu membawa
+     `contoh: true`. */
+  const [data, setData] = useState<Trade[]>([]);
   const [, setVersiPilihan] = useState(0);
   useEffect(() => {
     const naik = () => setVersiPilihan((v) => v + 1);
@@ -142,16 +160,12 @@ export function useRiwayat(): HasilData<Trade[]> {
     return () => window.removeEventListener('jt:pilihan-contoh', naik);
   }, []);
 
-  /* Contoh NYATA dari akun pemilik — sekali muat, dipakai saat layar butuh
-     data contoh (belum login, atau akun baru yang masih kosong). */
-  const [contohNyata, setContohNyata] = useState<Trade[] | null>(null);
-  useEffect(() => { void ambilContohNyata().then(setContohNyata); }, []);
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
 
   useEffect(() => {
     if (memuatAuth) return;
-    if (!pengguna) { setData(RIWAYAT); setMemuat(false); return; }
+    if (!pengguna) { setData([]); setMemuat(false); return; }
     setMemuat(true);
     /* SATU KUERI PER SUMBER, bukan satu kueri untuk semuanya.
        ──────────────────────────────────────────────────────────────────
@@ -222,37 +236,20 @@ export function useRiwayat(): HasilData<Trade[]> {
 
   const pakaiContoh = !pengguna || kosongBaru;
 
-  /* ── CONTOH NYATA MENIMPA PER SUMBER, BUKAN SELURUHNYA ────────────────
-     Dulu satu baris: `contohNyata ?? RIWAYAT`. Begitu dokumen contoh publik
-     terbit, ia menggantikan SEMUA contoh statis — termasuk sumber yang tidak
-     ia punyai sama sekali.
+  /* ── CONTOHNYA SATU: `RIWAYAT`, SETAHUN PENUH ─────────────────────────
+     Sempat ada lapisan kedua di sini: 150 transaksi ASLI pemilik dari
+     public/ringkasanAkun menimpa contoh statis, per sumber. Maksudnya baik
+     — angka nyata lebih jujur daripada karangan — tapi hasilnya bukan akun
+     siapa pun: dua minggu terakhir dari akun berisi ribuan baris, tanpa
+     emosi, tanpa setup, tanpa setoran. Kalender bulan berjalan kosong,
+     Pola Emosi kosong, winrate 82% di sebelah P/L minus (dilaporkan pemilik
+     3 Okt 2026).
 
-     Terukur 6 Sep 2026 lewat REST Firestore: 150 baris di
-     public/ringkasanAkun semuanya `kripto`, nol forex. Akibatnya panel
-     "Jurnal Trade-Fi" di mode preview dan di akun baru berbunyi "Belum ada
-     transaksi jurnal trade-fi" — padahal contoh statisnya punya 29 trade
-     forex yang siap pakai, cuma sudah terlanjur dibuang seluruhnya.
-
-     Sekarang penggantiannya per sumber: yang PUNYA data nyata memakainya,
-     yang tidak jatuh ke contoh statis. Dua sifat yang dijaga sekaligus —
-     angka nyata tetap menang di mana ia ada, dan tidak ada panel yang bisa
-     kosong hanya karena penerbitnya kebetulan tidak menyertakan sumbernya.
-
-     Penerbitnya juga sudah diperbaiki (lihat "DIAMBIL BERIMBANG PER SUMBER"
-     di terbitkanRingkasan), tapi perbaikan itu baru berlaku pada penerbitan
-     BERIKUTNYA. Yang di sini menyembuhkan dokumen yang sudah terlanjur
-     terbit, dan tetap berguna sesudahnya sebagai jaring pengaman. */
-  const contohGabung = useMemo(() => {
-    if (!contohNyata || !contohNyata.length) return RIWAYAT;
-    const adaSumber = new Set(contohNyata.map((t) => t.sumber));
-    const penambal = RIWAYAT.filter((t) => !adaSumber.has(t.sumber));
-    if (!penambal.length) return contohNyata;
-    return [...contohNyata, ...penambal].sort((a, b) => b.waktu - a.waktu);
-  }, [contohNyata]);
-
+     Sekarang contohnya dibangkitkan di data/contoh.ts dan dipakai apa
+     adanya. Satu pembacaan Firestore per pengunjung ikut hilang, dan
+     transaksi pemilik berhenti disiarkan (lihat `terbitkanRingkasan`). */
   return {
-    /* Prioritas contoh: transaksi NYATA pemilik > contoh statis, per sumber. */
-    data: pakaiContoh ? contohGabung : data,
+    data: pakaiContoh ? RIWAYAT : data,
     memuat: memuat || memuatAuth,
     contoh: pakaiContoh,
     galat,
@@ -357,7 +354,11 @@ export function usePosisi(): HasilData<Posisi[]> & {
   tersendat: boolean;
 } {
   const { pengguna, memuat: memuatAuth, pemilik } = useAuth();
-  const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
+  /* Kosong, bukan posisi contoh — alasan yang sama dengan `useRiwayat`:
+     sebelum dokumen publiknya terbaca, pemilik tanpa bursa aktif sempat
+     melihat BTC/SOL contoh di bawah judul "Posisi Terbuka". Contoh untuk
+     pengunjung punya cabangnya sendiri di bawah, berlabel. */
+  const [data, setData] = useState<Posisi[]>([]);
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
   const [ada, setAda] = useState(false);
@@ -805,84 +806,22 @@ export interface RingkasanAkun {
   sejak: number;
 }
 
-export async function terbitkanRingkasan(r: RingkasanAkun, trade?: Trade[]) {
-  const { setDoc } = await import('firebase/firestore');
+export async function terbitkanRingkasan(r: RingkasanAkun) {
+  const { setDoc, deleteField } = await import('firebase/firestore');
   await setDoc(doc(db, 'public', 'ringkasanAkun'), {
     ...r,
     kurva: r.kurva.slice(-60).map((x) => Number(x.toFixed(2))),
-    /* Transaksi pemilik (dipadatkan) ikut terbit sebagai DATA CONTOH untuk
-       akun baru — halaman kosong tidak menjelaskan apa pun tentang apa yang
-       akan didapat.
+    /* ── `contohTrade` DICABUT, DAN YANG SUDAH TERBIT DIHAPUS ───────────
+       Dulu 150 transaksi terakhir pemilik (pair, arah, waktu, P/L, lot,
+       emosi) ikut terbit di sini sebagai bahan contoh untuk mode preview
+       dan akun baru. Pembacanya sudah tidak ada: contoh sekarang
+       dibangkitkan di data/contoh.ts.
 
-       `alasan` DICABUT dari sini. Komentar ini dulu berbunyi "tanpa catatan
-       pribadi" padahal barisnya menyalin `u: t.alasan` — dan dokumen ini
-       terbaca siapa saja tanpa login, cukup dengan alamatnya. Isinya
-       kebetulan masih aman waktu diperiksa (150 baris berbunyi "Sinkron
-       Binance", hasil sinkron otomatis, bukan tulisan tangan), jadi tidak
-       ada yang terlanjur tersiar. Yang salah salurannya: begitu pemiliknya
-       menulis satu catatan sungguhan — kenapa ia masuk, apa yang ia
-       sesali — kalimat itu terbit ke alamat publik dalam dua detik, tanpa
-       ada yang bertanya.
-
-       `emosi` tetap ikut: isinya kosakata tertutup dari menu pilihan
-       (Netral / Serakah / Takut / …), bukan tulisan bebas, dan panel Pola
-       Emosi butuh itu supaya akun baru melihat panelnya hidup. Batasnya di
-       situ: label yang bisa ditebak boleh, kalimat yang ditulis sendiri
-       tidak. Kalau batas itu mau digeser, geser DI SINI — bukan dengan
-       menyaring di sisi pembaca, karena yang menentukan apa yang tersiar
-       adalah apa yang ditulis, bukan apa yang dibaca. */
-    /* ── DIAMBIL BERIMBANG PER SUMBER, BUKAN 150 TERATAS ────────────────
-       `trade.slice(0, 150)` mengambil 150 baris teratas dari satu daftar
-       gabungan. Selama satu sumber jauh lebih ramai daripada yang lain, ia
-       menelan seluruh jatah — dan sumber yang lain terbit sebagai NOL.
-
-       Terukur 6 Sep 2026: ke-150 baris di public/ringkasanAkun semuanya
-       `kripto`, tidak satu pun forex. Akibatnya panel "Jurnal Trade-Fi" di
-       mode preview dan di akun baru berbunyi "Belum ada transaksi jurnal
-       trade-fi" — bukan karena datanya tidak ada, melainkan karena tidak
-       ada yang tersisa untuknya saat diterbitkan. Dilaporkan pemilik dari
-       layarnya sendiri.
-
-       Ini KESALAHAN YANG SAMA yang sudah diperbaiki di sisi pembacaan (lihat
-       "SATU KUERI PER SUMBER" di useRiwayat, yang lahir waktu 1100 transaksi
-       MT5 menelan jatah kripto). Perbaikannya waktu itu tidak ikut turun ke
-       penerbit ini, dan gejalanya cuma kebalikannya: yang menang sekarang
-       kripto.
-
-       Gilir per sumber, bukan kuota tetap per sumber: kalau nanti cuma ada
-       satu sumber, ia tetap boleh memakai seluruh 150 — yang dijaga hanya
-       bahwa sumber yang PUNYA data tidak pernah tergusur sampai nol. */
-    ...(trade ? {
-      contohTrade: (() => {
-        const perSumber = new Map<string, typeof trade>();
-        for (const t of trade) {
-          const k = t.sumber || 'lain';
-          const a = perSumber.get(k);
-          if (a) a.push(t); else perSumber.set(k, [t]);
-        }
-        const antre = [...perSumber.values()];
-        const pilih: typeof trade = [];
-        for (let i = 0; pilih.length < 150; i++) {
-          let adaYangDiambil = false;
-          for (const a of antre) {
-            if (i >= a.length || pilih.length >= 150) continue;
-            pilih.push(a[i]);
-            adaYangDiambil = true;
-          }
-          if (!adaYangDiambil) break;   // semua sumber habis
-        }
-        /* Diurutkan ulang supaya kurva & kalender di layar penerima tetap
-           berurutan waktu; giliran di atas cuma cara MEMILIH, bukan urutan
-           yang dikirim. */
-        return pilih
-          .sort((a, b) => b.waktu - a.waktu)
-          .map((t) => ({
-            p: t.pair, a: t.arah, s: t.sumber, w: t.waktu,
-            n: Number(t.pnl.toFixed(2)), l: t.lot ?? 0,
-            e: t.emosi ?? '',
-          }));
-      })(),
-    } : {}),
+       Menyiarkan transaksi sungguhan ke dokumen yang terbaca siapa saja
+       tanpa login cuma pantas selama ada yang membutuhkannya. `deleteField`
+       — bukan sekadar berhenti menulis — karena `merge: true` membiarkan
+       medan lama tetap di tempatnya selamanya. */
+    contohTrade: deleteField(),
     _updatedAt: Date.now(),
   }, { merge: true });
 }
@@ -896,31 +835,4 @@ export async function terbitkanTeksBeranda(judul: string, sub: string) {
     { teksJudul: judul, teksSub: sub, _updatedAt: Date.now() }, { merge: true });
 }
 
-/* Data contoh NYATA milik pemilik, dibaca akun baru & mode pameran.
-   Dimuat sekali per sesi; kalau dokumennya belum ada (pemilik belum pernah
-   membuka dashboard sejak fitur ini), jatuh ke contoh statis. */
-let contohNyataCache: Trade[] | null | undefined;
-export async function ambilContohNyata(): Promise<Trade[] | null> {
-  if (contohNyataCache !== undefined) return contohNyataCache;
-  try {
-    const { getDoc } = await import('firebase/firestore');
-    const s = await getDoc(doc(db, 'public', 'ringkasanAkun'));
-    const mentah = s.data()?.contohTrade;
-    if (!Array.isArray(mentah) || !mentah.length) { contohNyataCache = null; return null; }
-    contohNyataCache = mentah.map((x: any, i: number): Trade => ({
-      id: 'pub' + i,
-      pair: String(x.p ?? ''),
-      arah: x.a === 'SELL' ? 'SELL' : 'BUY',
-      sumber: x.s === 'forex' ? 'forex' : 'kripto',
-      waktu: Number(x.w) || 0,
-      pnl: Number(x.n) || 0,
-      lot: Number(x.l) || 0,
-      emosi: String(x.e ?? ''),
-      alasan: String(x.u ?? ''),
-    } as Trade));
-    return contohNyataCache;
-  } catch {
-    contohNyataCache = null;
-    return null;
-  }
-}
+

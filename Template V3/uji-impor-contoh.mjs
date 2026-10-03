@@ -3,11 +3,14 @@
    jurnal yang sama.
 
    Yang dijaga di sini satu hal yang tidak bisa dibatalkan: transaksi hasil
-   migrasi V2 memakai id `fx-…` dan `cr-…` — id yang SAMA PERSIS dengan
-   konstanta di data/contoh.ts. Kalau awalan `contoh-` hilang dalam suatu
-   revisi, menekan "Impor data contoh" akan menimpa 123 transaksi asli
-   pemilik dengan angka karangan, dan tidak ada tombol yang bisa
-   mengembalikannya.
+   migrasi V2 memakai id `fx-…` dan `cr-…`. Contoh lama memakai id yang
+   SAMA PERSIS, jadi tanpa awalan `contoh-` menekan "Impor data contoh"
+   akan menimpa transaksi asli pemilik dengan angka karangan.
+
+   Sejak 3 Okt 2026 contohnya dibangkitkan (setahun penuh) dengan id
+   `s-fx-…`/`s-cr-…` — dua lapis jarak dari id migrasi, dan dua-duanya
+   diuji di bawah: id contohnya sendiri tidak boleh berbentuk id migrasi,
+   DAN id impornya tetap wajib berawalan `contoh-`.
 
    Sumbernya dibaca LANGSUNG lewat esbuild, bukan disalin tangan: salinan
    tangan akan tetap lulus walau berkas aslinya berubah. */
@@ -24,35 +27,67 @@ const cek = (nama, dapat, harap) => {
 
 /* ── 1. Riwayat contoh: id apa adanya, dari sumbernya ─────────────────── */
 const srcContoh = readFileSync('src/data/contoh.ts', 'utf8');
-const aw = srcContoh.indexOf('function buatRiwayat');
+/* Dari pembangkit acaknya sampai tepat sebelum RIWAYAT — seluruh pembantu
+   `buatRiwayat` tinggal di rentang itu. Tipenya dibuang esbuild. */
+const aw = srcContoh.indexOf('function acakBerbenih');
 const ak = srcContoh.indexOf('export const RIWAYAT');
+if (aw < 0 || ak < aw) throw new Error('potongan pembangkit riwayat tidak ketemu');
 const jsRiwayat = transformSync(
-  srcContoh.slice(aw, ak).replace(/: Trade\[\]/g, '').replace(/^export /gm, ''),
+  srcContoh.slice(aw, ak).replace(/^export /gm, ''),
   { loader: 'ts', format: 'cjs' }).code;
 const skrg = Date.now();
-const buatRiwayat = new Function('skrg', 'HARI', `${jsRiwayat}; return buatRiwayat;`)(skrg, 86_400_000);
-const RIWAYAT = buatRiwayat();
+const bangun = (kini) => new Function('skrg', 'HARI', 'JAM', 'MENIT', `${jsRiwayat}; return buatRiwayat;`)(
+  kini, 86_400_000, 3_600_000, 60_000)();
+const RIWAYAT = bangun(skrg);
 
-cek('jumlah transaksi contoh', RIWAYAT.length, 123);
+/* ── 1b. Setahun penuh, lengkap, dan tidak berubah tiap dimuat ───────── */
+const HARI = 86_400_000;
+cek('contohnya ratusan transaksi, bukan segelintir', RIWAYAT.length > 700 && RIWAYAT.length < 1400, true);
+cek('rentangnya minimal 365 hari', (skrg - Math.min(...RIWAYAT.map((t) => t.waktu))) / HARI >= 365, true);
+cek('tidak ada transaksi dari masa depan', RIWAYAT.some((t) => t.waktu > skrg), false);
+cek('dua jurnal sama-sama berisi',
+  ['forex', 'kripto'].map((s) => RIWAYAT.filter((t) => t.sumber === s).length > 250), [true, true]);
+cek('tiap transaksi punya emosi dan setup', RIWAYAT.every((t) => t.emosi && t.alasan), true);
+cek('transaksi kripto membawa nilai order & leverage',
+  RIWAYAT.filter((t) => t.sumber === 'kripto').every((t) => t.nilaiOrder > 0 && t.leverage > 0), true);
+/* Tiga belas bulan kalender (12 penuh + berjalan), dua jurnal: tidak boleh
+   ada bulan yang kosong — itulah keluhan yang melahirkan contoh ini. */
+const bulanDari = (s) => new Set(RIWAYAT.filter((t) => t.sumber === s).map((t) => {
+  const d = new Date(t.waktu); return d.getFullYear() * 12 + d.getMonth();
+})).size;
+cek('forex: 12 bulan terakhir semuanya berisi', bulanDari('forex') >= 12, true);
+cek('kripto: 12 bulan terakhir semuanya berisi', bulanDari('kripto') >= 12, true);
+/* Deterministik: dibangkitkan dua kali pada jam yang sama -> sama persis;
+   dibangkitkan sejam kemudian -> yang lama tidak berubah sedikit pun. */
+cek('dimuat ulang -> transaksinya sama persis',
+  JSON.stringify(bangun(skrg)) === JSON.stringify(RIWAYAT), true);
+const nanti = bangun(skrg + 3_600_000);
+cek('sejam kemudian -> yang lama tidak berubah',
+  JSON.stringify(nanti.filter((t) => t.waktu <= skrg)) === JSON.stringify(RIWAYAT), true);
 
 /* ── 2. Awalan id: satu string, dua berkas ────────────────────────────── */
 const srcImpor = readFileSync('src/lib/impor-contoh.ts', 'utf8');
 const awalan = srcImpor.match(/AWALAN_CONTOH\s*=\s*'([^']+)'/)?.[1];
 cek('AWALAN_CONTOH terbaca dari sumbernya', awalan, 'contoh-');
 
-/* gerbang.tsx harus MENGIMPOR awalannya, bukan menyalinnya. Salinan tulisan
+/* Spanduknya harus MENGIMPOR awalannya, bukan menyalinnya. Salinan tulisan
    tangan pernah ada di sana — perlu waktu impornya masih dinamis — dan
-   baris ini yang memastikan ia tidak kembali. */
-const srcGerbang = readFileSync('src/components/gerbang.tsx', 'utf8');
+   baris ini yang memastikan ia tidak kembali.
+
+   Berkasnya `spanduk-contoh.tsx`, bukan `gerbang.tsx`: SpandukContoh
+   dipindah supaya Firestore tidak ikut ke bundel awal, dan uji ini sempat
+   tertinggal membaca berkas lama (ketahuan 3 Okt 2026 — ia gagal tanpa ada
+   yang rusak). */
+const srcGerbang = readFileSync('src/components/spanduk-contoh.tsx', 'utf8');
 /* KOMENTAR DIBUANG DULU. Versi pertama uji ini gagal bukan karena kodenya
    salah, melainkan karena komentar yang MENJELASKAN kenapa impor dinamis
    dibuang justru memuat frasa yang dicarinya. Uji yang membaca komentar
    sebagai kode akan menghukum setiap penjelasan yang baik. */
 const kodeGerbang = srcGerbang.replace(/\/\*[\s\S]*?\*\//g, '');
 
-cek('gerbang.tsx mengimpor AWALAN_CONTOH',
+cek('spanduk mengimpor AWALAN_CONTOH',
   /import\s*\{[^}]*AWALAN_CONTOH[^}]*\}\s*from\s*'@\/lib\/impor-contoh'/.test(kodeGerbang), true);
-cek('gerbang.tsx tidak menyalin awalannya sendiri',
+cek('spanduk tidak menyalin awalannya sendiri',
   /startsWith\('contoh-'\)/.test(kodeGerbang), false);
 
 /* IMPOR STATIS, bukan dinamis. `await import(...)` memecahnya jadi potongan
@@ -64,14 +99,31 @@ cek('impor-contoh ditarik statis, bukan lewat await import()',
 
 /* ── 3. Yang paling penting: TIDAK menabrak id migrasi ────────────────── */
 const idImpor = RIWAYAT.map((t) => awalan + t.id);
-const idMigrasi = new Set(RIWAYAT.map((t) => t.id));          // 'fx-0', 'cr-0', …
-cek('tidak ada id impor yang menabrak id migrasi',
-  idImpor.filter((id) => idMigrasi.has(id)).length, 0);
+/* Id migrasi V2 milik pemilik: 'fx-0', 'cr-0', … — bentuk yang DULU juga
+   dipakai contoh. */
+const BENTUK_MIGRASI = /^(fx|cr)-\d+$/;
+cek('tidak ada id impor yang berbentuk id migrasi',
+  idImpor.filter((id) => BENTUK_MIGRASI.test(id)).length, 0);
 cek('semua id impor berawalan contoh-',
   idImpor.every((id) => id.startsWith('contoh-')), true);
 cek('semua id impor unik', new Set(idImpor).size, idImpor.length);
-cek('id migrasi asli tetap berawalan fx-/cr-',
-  [...idMigrasi].every((id) => /^(fx|cr)-\d+$/.test(id)), true);
+cek('id contoh sendiri TIDAK berbentuk id migrasi',
+  RIWAYAT.some((t) => BENTUK_MIGRASI.test(t.id)), false);
+
+/* ── 3b. Hapus impor: dari yang ADA di jurnal, plus id impor lama ─────── */
+const kodeImpor = srcImpor.replace(/\/\*[\s\S]*?\*\//g, '');
+cek('hapusImporContoh menerima jurnal yang termuat',
+  /export async function hapusImporContoh\(uid: string, riwayat: Trade\[\]\)/.test(kodeImpor), true);
+cek('hapus tidak lagi menghitung ulang dari contoh hari ini',
+  /hapusImporContoh[\s\S]*RIWAYAT\.slice/.test(kodeImpor), false);
+cek('id impor versi lama (contoh-fx-0…28, contoh-cr-0…93) tetap terjangkau',
+  /length: 29[\s\S]*fx-[\s\S]*length: 94[\s\S]*cr-/.test(kodeImpor), true);
+/* Yang disalin dibatasi — setahun penuh berarti ~950 tulisan per klik. */
+const HARI_IMPOR = Number(srcImpor.match(/HARI_IMPOR\s*=\s*(\d+)/)?.[1]);
+const bahan = RIWAYAT.filter((t) => t.waktu >= skrg - HARI_IMPOR * HARI);
+cek('impor dibatasi beberapa bulan terakhir', HARI_IMPOR > 0 && HARI_IMPOR <= 90, true);
+cek('jumlah yang disalin muat satu batch (<400) dan tidak kosong',
+  bahan.length > 40 && bahan.length < 400, true);
 
 /* ── 4. Bentuk dokumen benar-benar terbaca keTrade ────────────────────── */
 const aT = srcContoh.length && readFileSync('src/lib/data.ts', 'utf8');
@@ -81,9 +133,17 @@ const q = src.indexOf('export interface Ringkasan');
 const jsKeTrade = transformSync(
   src.slice(p, q).replace(/: DocumentData/g, '').replace(/: Trade/g, '').replace(/: Sumber/g, ''),
   { loader: 'ts', format: 'cjs' }).code;
-const keTrade = new Function('n', 'ms', `${jsKeTrade}; return keTrade;`)(
+/* `keTrade` membaca emosi & alasan lewat lib/medan-jurnal.ts — aturannya
+   memang tinggal di sana. Berkas itu murni (tanpa impor saat berjalan),
+   jadi ia dimuat utuh dari sumbernya, bukan ditiru di sini. */
+const jsMedan = transformSync(readFileSync('src/lib/medan-jurnal.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code;
+const modMedan = { exports: {} };
+new Function('exports', 'module', jsMedan)(modMedan.exports, modMedan);
+const medan = modMedan.exports;
+const keTrade = new Function('n', 'ms', 'emosiJurnal', 'alasanJurnal', `${jsKeTrade}; return keTrade;`)(
   (v) => (typeof v === 'number' && isFinite(v) ? v : 0),
   (v) => (typeof v === 'number' ? v : (v?.milis ?? 0)),
+  medan.emosiJurnal, medan.alasanJurnal,
 );
 
 /* Catatannya dibaca LANGSUNG dari sumbernya, bukan disalin ke sini.
@@ -98,7 +158,7 @@ const dokumen = (t) => ({
   simbol: t.pair.toUpperCase(),
   arah: t.arah,
   sumber: t.sumber,
-  ukuran: t.sumber === 'forex' ? { lot: t.lot } : { qty: t.lot },
+  ukuran: t.sumber === 'forex' ? { lot: t.lot } : { qty: t.lot, nilai: t.nilaiOrder, leverage: t.leverage },
   pnl: t.pnl,
   masukWaktu: { milis: t.waktu },
   keluarWaktu: { milis: t.waktu },
@@ -121,6 +181,9 @@ cek('forex — pnl bolak-balik utuh', bacaFx.pnl, fx.pnl);
 cek('forex — ukuran terbaca sebagai lot', bacaFx.lot, fx.lot);
 cek('kripto — ukuran terbaca sebagai qty', bacaCr.lot, cr.lot);
 cek('kripto — sumber tetap kripto', bacaCr.sumber, 'kripto');
+cek('kripto — nilai order ikut terbaca', bacaCr.nilaiOrder, cr.nilaiOrder);
+cek('kripto — leverage ikut terbaca', bacaCr.leverage, cr.leverage);
+cek('emosi ikut terbaca', bacaFx.emosi, fx.emosi);
 cek('waktu tidak hilang', bacaFx.waktu, fx.waktu);
 
 /* KRUSIAL: `latihan` harus false. Kalau true, seluruh baris hasil impor

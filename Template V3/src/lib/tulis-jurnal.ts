@@ -7,7 +7,7 @@ import { db } from '@/lib/data';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
-import type { Sumber } from '@/data/contoh';
+import { ARUS_CONTOH, type Sumber } from '@/data/contoh';
 import { catatanJurnal, emosiJurnal, emosiEvaluasiJurnal } from '@/lib/medan-jurnal';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -198,9 +198,9 @@ export interface Arus {
   catatan: string;
 }
 
-/* TIDAK ADA ARUS KAS CONTOH — dan ini disengaja.
+/* HOOK INI TIDAK PERNAH MEMULANGKAN ARUS CONTOH — dan ini disengaja.
    ──────────────────────────────────────────────────────────────────────
-   Pernah ada, selama satu rilis, dengan maksud baik: mengisi kartu saldo
+   Pernah, selama satu rilis, dengan maksud baik: mengisi kartu saldo
    milik pengguna baru. Akibatnya saldo Dashboard naik $1.800 di atas
    jurnal untuk SETIAP akun yang tidak pernah mencatat setoran — dan tidak
    pernah mencatat setoran bukan tanda pengguna baru, itu cuma tanda
@@ -209,7 +209,12 @@ export interface Arus {
    Bedanya dengan contoh di Personal Area: porto contoh berhenti di
    halamannya sendiri, sedangkan arus kas ikut ke dalam ARITMATIKA modal,
    saldo, dan kurva dua bulan yang dibaca halaman lain. Angka yang salah
-   lebih buruk daripada kartu yang kosong. */
+   lebih buruk daripada kartu yang kosong.
+
+   Arus contoh sekarang ADA (3 Okt 2026, untuk mode preview yang lengkap),
+   tapi pintunya `pilihArus` di bawah — yang menuntut bukti bahwa riwayat
+   yang sedang tampil memang contoh. Hook ini tetap cuma tahu satu hal:
+   apa yang tersimpan di akun orangnya. */
 export function useArusKas(): { data: Arus[]; memuat: boolean } {
   const { pengguna, memuat: memuatAuth } = useAuth();
   const [data, setData] = useState<Arus[]>([]);
@@ -268,6 +273,28 @@ export function arusBersih(daftar: Arus[], sumber: Sumber) {
   return daftar
     .filter((a) => a.sumber === sumber)
     .reduce((s, a) => s + (a.jenis === 'setor' ? a.nilai : -a.nilai), 0);
+}
+
+/** Arus yang DIHITUNG layar: milik penggunanya — kecuali riwayat yang
+ *  tampil memang contoh (`useRiwayat().contoh`) DAN ia belum mencatat satu
+ *  setoran pun. Dua syarat, dua-duanya wajib:
+ *
+ *  · Tanpa syarat pertama, akun sungguhan yang belum pernah mencatat
+ *    setoran mendapat $630 modal karangan — cacat $1.800 yang dulu itu.
+ *  · Tanpa syarat kedua, akun baru yang mencatat setoran pertamanya tidak
+ *    melihat setoran itu muncul sampai transaksi pertamanya masuk.
+ *
+ *  Yang dipulangkan untuk contoh adalah larik `ARUS_CONTOH` ITU SENDIRI,
+ *  bukan salinannya, supaya `arusItuContoh` bisa mengenalinya. */
+export function pilihArus(riwayatContoh: boolean, nyata: Arus[]): Arus[] {
+  return riwayatContoh && nyata.length === 0 ? ARUS_CONTOH : nyata;
+}
+
+/** Daftar ini arus contoh? Dipakai untuk mematikan tombol hapus barisnya —
+ *  id-nya tidak ada di Firestore, jadi menghapusnya tidak merusak apa pun,
+ *  tapi tombol yang ditekan lalu tidak terjadi apa-apa terbaca rusak. */
+export function arusItuContoh(daftar: Arus[]): boolean {
+  return daftar === (ARUS_CONTOH as Arus[]);
 }
 
 /* ════════════════════════════════════════════════════════════════════════

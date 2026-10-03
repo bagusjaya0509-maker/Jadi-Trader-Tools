@@ -15,6 +15,7 @@ import { usePorto, bawaan, idBaru, type PosAset } from '@/lib/porto';
 import { useHargaPasar } from '@/lib/harga';
 import { useAuth } from '@/lib/auth';
 import { useTema } from '@/lib/tema';
+import { KAS_CONTOH } from '@/data/kas-contoh';
 
 /* ════════════════════════════════════════════════════════════════════════
    PERSONAL AREA — pelacak portofolio
@@ -137,14 +138,40 @@ export default function PersonalArea() {
      Report. Sumbernya Catatan Kas (users/{uid}/porto/arus), jadi grafik
      ini TIDAK mengarang: bulan tanpa catatan memang tampil nol.
 
-     Delapan bulan terakhir, termasuk bulan berjalan. Lebih dari itu batang
-     bulanan jadi terlalu kurus untuk dibaca di lebar panel ini. */
+     ── DUA BELAS BULAN DI LAYAR LEBAR, DELAPAN DI PONSEL ───────────────
+     Dulu delapan di semua layar. Diminta pemilik 3 Okt 2026: setahun
+     penuh. Di panel selebar dua pertiga layar dua belas pasang batang
+     masih terbaca; di lebar ponsel tidak — tiap bulan cuma kebagian ~20
+     px, dan dua batang yang berhimpit tidak bisa dibandingkan. Jadi
+     jumlah bulannya mengikuti lebar layar, bukan dipaksa satu angka. */
   const [grafik, setGrafik] = useState<'porto' | 'kas'>('porto');
-  const { daftar: kasDaftar } = useKas();
+  const [layarLebar, setLayarLebar] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)');
+    const ubah = () => setLayarLebar(mq.matches);
+    mq.addEventListener('change', ubah);
+    return () => mq.removeEventListener('change', ubah);
+  }, []);
+  const bulanKas = layarLebar ? 12 : 8;
+
+  /* ── CATATAN KAS CONTOH ───────────────────────────────────────────────
+     Dipakai hanya selama DUA hal benar sekaligus: porto yang tampil masih
+     contoh (`contoh` — pengunjung, atau akun baru yang belum mengisi apa
+     pun dan belum memilih "mulai dari nol"), dan catatan kas aslinya
+     kosong. Akun yang porto-nya sudah sungguhan tidak pernah melihat kas
+     contoh di sebelahnya: angka karangan di samping angka miliknya sendiri
+     tidak bisa dibedakan siapa pun.
+
+     `PanelKas` di bawah memutuskan dengan aturan yang sama dari hook-nya
+     sendiri; yang dioper cuma izinnya. */
+  const { daftar: kasNyata, memuat: kasMemuat } = useKas();
+  const kasContoh = contoh && !kasMemuat && kasNyata.length === 0;
+  const kasDaftar = kasContoh ? KAS_CONTOH : kasNyata;
   const cashFlow = useMemo(() => {
     const kini = kunciBulanKas();
     const hasil: { bulan: string; masuk: number; keluar: number }[] = [];
-    for (let i = 7; i >= 0; i--) {
+    for (let i = bulanKas - 1; i >= 0; i--) {
       const k = geserBulan(kini, -i);
       const r = ringkasBulan(kasDaftar, k);
       const [t, b] = k.split('-').map(Number);
@@ -154,7 +181,7 @@ export default function PersonalArea() {
       });
     }
     return hasil;
-  }, [kasDaftar]);
+  }, [kasDaftar, bulanKas]);
   const adaCashFlow = cashFlow.some((c) => c.masuk || c.keluar);
 
   const bulanIni = riwayatBulan[riwayatBulan.length - 1];
@@ -201,6 +228,7 @@ export default function PersonalArea() {
         <KartuKpi label="Aset Kotor"    nilai={rupiahRingkas(totalAset)}      catatan={`${tampil.aset.length} pos tercatat`} Ikon={Wallet} />
         <KartuKpi label="Porto Bersih"  nilai={rupiahRingkas(portoBersih)}
                   delta={tumbuh === null ? undefined : Number(tumbuh.toFixed(1))}
+                  deltaSufiks="vs bulan lalu"
                   catatan={tumbuh === null ? 'belum ada bulan pembanding' : undefined} Ikon={TrendingUp} />
         <KartuKpi label="Liquid Cash"   nilai={rupiahRingkas(likuid)}         catatan="tanpa emas & sekuritas" Ikon={Banknote} />
         <KartuKpi label="Total Bon"     nilai={rupiahRingkas(totalKewajiban)} catatan={`${tampil.kewajiban.length} kewajiban`} Ikon={Scale} warna="text-red-400" />
@@ -218,7 +246,8 @@ export default function PersonalArea() {
       )}
       {!memuat && !pengguna && (
         <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-[12.5px] text-zinc-400">
-          Masuk dulu untuk mencatat portofoliomu. Data ini tersimpan di akunmu sendiri dan tidak dilihat siapa pun.
+          Yang tampil di halaman ini <span className="text-amber-300/90">data contoh</span>, setahun terakhir.
+          Masuk dulu untuk mencatat portofoliomu sendiri — datanya tersimpan di akunmu dan tidak dilihat siapa pun.
         </div>
       )}
       {/* Tawaran isi awal — hanya kalau memang belum ada apa-apa, dan hanya
@@ -323,7 +352,7 @@ export default function PersonalArea() {
             }
             sub={grafik === 'porto'
               ? 'Porto bersih tiap bulan, dicatat sejak kamu mulai memakai halaman ini.'
-              : 'Pemasukan dan pengeluaran per bulan dari Catatan Kas, delapan bulan terakhir.'}
+              : `Pemasukan dan pengeluaran per bulan dari Catatan Kas, ${bulanKas === 12 ? 'dua belas' : 'delapan'} bulan terakhir.`}
           />
           <div className="h-[300px] px-2 pb-4">
             {grafik === 'kas' ? (
@@ -338,7 +367,7 @@ export default function PersonalArea() {
                     dengan grafik di Sales Report: tanpa itu dua batang satu
                     bulan bisa terlempar jauh karena masing-masing dipusatkan
                     di slotnya sendiri. */}
-                <BarChart data={cashFlow} barSize={18} barGap={3} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
+                <BarChart data={cashFlow} barSize={bulanKas === 12 ? 14 : 18} barGap={3} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                   <XAxis dataKey="bulan" tick={{ fill: abuSumbu, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: abuSumbu, fontSize: 11 }} axisLine={false} tickLine={false} width={56}
@@ -639,7 +668,7 @@ export default function PersonalArea() {
           ketikan, dan tautan Telegram. Diminta pemilik 9 Sep 2026. Datanya
           di users/{uid}/porto/arus — dokumen yang sudah ditulis agen arus.js. */}
       <div className="mt-4">
-        <PanelKas />
+        <PanelKas daftarContoh={contoh ? KAS_CONTOH : null} />
       </div>
     </div>
   );

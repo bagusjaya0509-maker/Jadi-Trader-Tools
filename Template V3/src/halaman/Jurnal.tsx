@@ -12,7 +12,7 @@ import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun, type RincianBursa } from '@/lib/akun';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
-import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, sinkronRiwayatHyperliquid, sinkronRiwayatDompet, sinkronArusBinance, sinkronArusHyperliquid, MULAI_ARUS_OTOMATIS, useSaldoDompetTertaut, type Arus } from '@/lib/tulis-jurnal';
+import { useArusKas, arusBersih, pilihArus, sinkronRiwayatMt5, sinkronRiwayatBinance, sinkronRiwayatHyperliquid, sinkronRiwayatDompet, sinkronArusBinance, sinkronArusHyperliquid, MULAI_ARUS_OTOMATIS, useSaldoDompetTertaut, type Arus } from '@/lib/tulis-jurnal';
 import { bacaStatistik, bacaPnl } from '@/lib/catatan-stat';
 import { Link } from 'react-router-dom';
 
@@ -193,7 +193,7 @@ function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: strin
    ranjau. Mengisinya juga akan memunculkan dua spanduk impor sekaligus di
    satu halaman, karena blok ini digambar dua kali (Trade-Fi dan Kripto).
    Pilihannya tinggal punya satu rumah: Dashboard. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, dataContoh, rincianTambahan, pemisah = false }: {
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, dataContoh, memuat, rincianTambahan, pemisah = false }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
   akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
@@ -205,6 +205,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
    *  catatan di atas. Yang ini tidak menggambar apa pun, ia cuma menutup
    *  gerbang efek auto-sinkron. */
   dataContoh: boolean;
+  /** Jurnalnya BELUM selesai dimuat — `trade` masih kosong, bukan karena
+   *  akunnya kosong. Sinkron otomatis menunggu ini padam: ia menyaring
+   *  "yang sudah ada" dari `trade`, dan daftar yang belum datang berarti
+   *  semua fill seminggu terakhir dianggap baru lalu ditulis ulang. */
+  memuat: boolean;
   /** Saldo di luar broker yang tetap pantas berjejer di kartu Saldo —
    *  sekarang: dompet on-chain yang tertaut. Ditambahkan di sini, bukan di
    *  `useAkunBinance`, karena hook itu memang cuma tahu akun backend; yang
@@ -360,11 +365,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
      dan menariknya tiap setengah menit cuma membebani backend untuk jawaban
      yang hampir selalu "tidak ada yang baru". */
   useEffect(() => {
-    if (!otomatis || !bisaTulis || sumber !== 'forex') return;
+    if (!otomatis || !bisaTulis || memuat || sumber !== 'forex') return;
     void tarikDariMt5(true);
     const jam = setInterval(() => void tarikDariMt5(true), 5 * 60_000);
     return () => clearInterval(jam);
-  }, [otomatis, bisaTulis, sumber, tarikDariMt5]);
+  }, [otomatis, bisaTulis, memuat, sumber, tarikDariMt5]);
 
   /* ── Auto-sinkron Binance untuk jurnal KRIPTO ─────────────────────────
      Order yang ditutup lewat aplikasi Binance tidak pernah lewat layar
@@ -518,11 +523,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
        masih kosong dihitung dari 94 trade CONTOH: `terbaru` jadi > 0, cabang
        "7 hari" tidak pernah terpakai, dan jendelanya menyempit jadi sekitar
        1,5 hari — persis pada orang yang paling butuh tarikan 7 hari itu. */
-    if (!bisaTulis || dataContoh || sumber !== 'kripto') return;
+    if (!bisaTulis || memuat || dataContoh || sumber !== 'kripto') return;
     void tarikKripto();
     const jam = setInterval(() => void tarikKripto(), 5 * 60_000);
     return () => clearInterval(jam);
-  }, [bisaTulis, dataContoh, sumber, tarikKripto]);
+  }, [bisaTulis, memuat, dataContoh, sumber, tarikKripto]);
   const pl = useMemo(() => plPerHari(trade), [trade]);
   /* Dihitung dari `trade` yang SAMA dengan `pl`, bukan dari `tradeTampil`.
      Kalender memang tidak ikut disaring rentang riwayat (lihat catatan di
@@ -963,7 +968,12 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                           </Td>
                           <Td className="max-w-[150px] truncate text-[12px] text-zinc-500" title={t.alasan}>{t.alasan}</Td>
                           <Td>
-                            <button onClick={() => setModal(t)} disabled={!bisaTulis}
+                            {/* Baris CONTOH tidak punya dokumen untuk disunting.
+                                Modalnya memang menolak menyimpan kalau dokumennya
+                                tidak ketemu, tapi tombol yang membuka modal rusak
+                                tetap tombol yang rusak. */}
+                            <button onClick={() => setModal(t)} disabled={!bisaTulis || dataContoh}
+                              title={dataContoh ? 'Baris contoh — tambah transaksimu sendiri lewat tombol Tambah' : undefined}
                               className="cursor-pointer text-zinc-600 transition-colors hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
                               aria-label={`Sunting ${t.pair}`}>
                               <Pencil className="size-3.5" />
@@ -986,7 +996,13 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               <Panel className="flex min-w-0 flex-col">
                 <PanelHead judul="Kalender P/L" sub="Arahkan atau klik tanggalnya untuk rincian per pair." />
                 <div className="flex grow flex-col justify-start px-5 pb-5">
-                  <KalenderPl pl={pl} rincian={rincianHari} />
+                  {/* `key` wajib: `geserAwal` cuma nilai awal. Tanpa key,
+                      kalender yang terpasang saat contohnya masih tampil
+                      (sela sebelum sesi pulih) tetap di bulan lalu sesudah
+                      jurnal SUNGGUHAN datang — dan pemiliknya membuka
+                      jurnal di bulan yang salah tiap awal bulan. */}
+                  <KalenderPl key={dataContoh ? 'contoh' : 'nyata'} pl={pl} rincian={rincianHari}
+                              geserAwal={dataContoh && new Date().getDate() <= 10 ? -1 : 0} />
                 </div>
               </Panel>
               <Panel className="min-w-0">
@@ -1049,10 +1065,14 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
 }
 
 export default function Jurnal() {
-  const { data: RIWAYAT, contoh } = useRiwayat();
+  const { data: RIWAYAT, contoh, memuat } = useRiwayat();
   const saldoAwal = useSaldoAwal();
   const { pengguna } = useAuth();
-  const { data: arus } = useArusKas();
+  const { data: arusNyata } = useArusKas();
+  /* Aturan yang SAMA dengan lib/ringkasan.ts — kalau dua layar memilih
+     arusnya sendiri-sendiri, saldo Jurnal dan saldo Dashboard berselisih
+     persis sebesar setoran contohnya. */
+  const arus = pilihArus(contoh, arusNyata);
   /* Menulis butuh akun sendiri. Pengunjung yang belum masuk sedang melihat
      data contoh — tombol simpan di situ akan menulis ke ruang hampa. */
   const bisaTulis = !!pengguna;
@@ -1110,7 +1130,7 @@ export default function Jurnal() {
         Ikon={CandlestickChart} trade={forex} saldoAwal={saldoAwal}
         warna="text-amber-400" idGradien="gEqForex"
         akun={mt5} labelSaldo="Saldo MetaTrader 5" keIntegrasi="/integrations"
-        sumber="forex" arus={arus} bisaTulis={bisaTulis} dataContoh={contoh}
+        sumber="forex" arus={arus} bisaTulis={bisaTulis} dataContoh={contoh} memuat={memuat}
       />
 
       <BlokJurnal pemisah
@@ -1118,7 +1138,7 @@ export default function Jurnal() {
         Ikon={Bitcoin} trade={kripto} saldoAwal={0}
         warna="text-emerald-400" idGradien="gEqKripto"
         akun={binance} labelSaldo="Saldo Binance Futures" keIntegrasi="/integrations"
-        sumber="kripto" arus={arus} bisaTulis={bisaTulis} dataContoh={contoh}
+        sumber="kripto" arus={arus} bisaTulis={bisaTulis} dataContoh={contoh} memuat={memuat}
         rincianTambahan={rincianDompet}
       />
     </div>

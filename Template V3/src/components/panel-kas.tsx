@@ -17,7 +17,7 @@ import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/
 import { cn } from '@/lib/utils';
 import {
   useKas, useTautanTelegram, mintaKodeTelegram, lepasTelegram, ringkasBulan, kunciBulan, geserBulan, namaBulan,
-  uraiBanyak, rupiahKas, labelAsing, KATEGORI_KELUAR, KATEGORI_MASUK, type JenisKas, type KodeTelegram,
+  uraiBanyak, rupiahKas, labelAsing, KATEGORI_KELUAR, KATEGORI_MASUK, type JenisKas, type KodeTelegram, type BarisKas,
 } from '@/lib/kas';
 import { useKurs } from '@/lib/kurs-kas';
 
@@ -47,9 +47,38 @@ function IsianRupiah({ nilai, atur, placeholder }: { nilai: number | ''; atur: (
   );
 }
 
-export function PanelKas() {
-  const { daftar, memuat, galat, siap, tambah, hapus } = useKas();
+export function PanelKas({ daftarContoh }: {
+  /** Catatan contoh untuk halaman yang masih kosong (mode preview, atau
+   *  akun baru yang porto-nya pun masih contoh). Pemanggilnya yang
+   *  memutuskan boleh-tidaknya; di sini cuma dipakai selama catatan ASLI
+   *  kosong.
+   *
+   *  Contoh ini hanya DIGAMBAR. `tambah` dan `hapus` di bawah bekerja pada
+   *  dokumen Firestore lewat transaksi yang membaca isinya sendiri — mereka
+   *  tidak pernah menerima daftar yang sedang tampil, jadi baris contoh
+   *  tidak bisa ikut tersimpan ke akun siapa pun. */
+  daftarContoh?: BarisKas[] | null;
+} = {}) {
+  const { daftar: daftarNyata, memuat, galat, siap, tambah, hapus } = useKas();
+  const contoh = !!daftarContoh && !memuat && !galat && daftarNyata.length === 0;
+  const daftar = contoh ? daftarContoh! : daftarNyata;
   const [bulan, setBulan] = useState(kunciBulan());
+  /* ── CONTOH DI AWAL BULAN DIBUKA DI BULAN LALU ───────────────────────
+     Sepuluh hari pertama, bulan berjalan baru berisi segelintir baris —
+     dan panel contoh yang isinya empat baris terbaca "tidak lengkap",
+     padahal dua belas bulan penuh ada satu panah di sebelahnya. Catatan
+     SUNGGUHAN tidak pernah digeser: di sana bulan yang masih sepi memang
+     keadaannya.
+
+     Lewat efek, bukan nilai awal state: `contoh` baru diketahui sesudah
+     Firestore menjawab. `disentuh` menjaga supaya begitu orangnya menekan
+     panah, pilihannya tidak ditimpa lagi. */
+  const disentuh = useRef(false);
+  useEffect(() => {
+    if (disentuh.current) return;
+    setBulan(contoh && new Date().getDate() <= 10 ? geserBulan(kunciBulan(), -1) : kunciBulan());
+  }, [contoh]);
+  const pindahBulan = (n: number) => { disentuh.current = true; setBulan((b) => geserBulan(b, n)); };
   const [pesan, setPesan] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const ringkas = useMemo(() => ringkasBulan(daftar, bulan), [daftar, bulan]);
@@ -116,13 +145,17 @@ export function PanelKas() {
     <Panel className="p-4 sm:p-5">
       <PanelHead
         judul="Catatan Kas"
-        sub="Pemasukan dan pengeluaran per bulan. Ketik seperti chat, barisnya jadi sendiri."
+        sub={contoh
+          ? (siap
+            ? 'Yang tampil masih catatan contoh. Catat pengeluaran pertamamu, contohnya hilang sendiri.'
+            : 'Catatan contoh, setahun terakhir. Masuk untuk mulai mencatat punyamu sendiri.')
+          : 'Pemasukan dan pengeluaran per bulan. Ketik seperti chat, barisnya jadi sendiri.'}
         kanan={
           <div className="flex items-center gap-1 text-[12.5px]">
-            <button onClick={() => setBulan(geserBulan(bulan, -1))} aria-label="Bulan sebelumnya"
+            <button onClick={() => pindahBulan(-1)} aria-label="Bulan sebelumnya"
                     className="cursor-pointer rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><ChevronLeft className="size-4" /></button>
             <span className="min-w-[8.5rem] text-center font-medium text-zinc-200">{namaBulan(bulan)}</span>
-            <button onClick={() => setBulan(geserBulan(bulan, 1))} disabled={bulan >= bulanIni} aria-label="Bulan berikutnya"
+            <button onClick={() => pindahBulan(1)} disabled={bulan >= bulanIni} aria-label="Bulan berikutnya"
                     className="cursor-pointer rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-default disabled:opacity-30"><ChevronRight className="size-4" /></button>
           </div>
         }
@@ -306,7 +339,18 @@ export function PanelKas() {
                         {b.jenis === 'masuk' ? '+' : '−'}{rupiahKas(b.jumlah)}
                       </Td>
                       <Td className="w-8 text-right">
-                        <button onClick={() => { if (confirm(`Hapus “${b.judul}” (${rupiahKas(b.jumlah)})?`)) void jalankan(() => hapus(b.id), 'Dihapus.'); }}
+                        {/* Baris contoh tidak ada di Firestore — menghapusnya
+                            tidak merusak apa pun, tapi juga tidak menghapus
+                            apa pun, dan tombol yang ditekan lalu barisnya
+                            tetap di tempat terbaca sebagai kerusakan. */}
+                        <button onClick={() => {
+                                  if (contoh) {
+                                    setPesan('Itu baris contoh — catat punyamu dulu, contohnya hilang sendiri.');
+                                    setTimeout(() => setPesan(null), 4000);
+                                    return;
+                                  }
+                                  if (confirm(`Hapus “${b.judul}” (${rupiahKas(b.jumlah)})?`)) void jalankan(() => hapus(b.id), 'Dihapus.');
+                                }}
                                 disabled={sibuk} aria-label={`Hapus ${b.judul}`}
                                 className="cursor-pointer rounded p-1 text-zinc-700 transition-colors hover:bg-zinc-800 hover:text-red-400">
                           <Trash2 className="size-3.5" />

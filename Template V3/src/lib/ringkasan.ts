@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { statGabungan, statPer, saldoDuaBulan, kurvaEkuitas } from '@/lib/hitung';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { useAkunMt5, useAkunBinance } from '@/lib/akun';
-import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
+import { useArusKas, arusBersih, pilihArus } from '@/lib/tulis-jurnal';
 
 /* ════════════════════════════════════════════════════════════════════════
    MODEL UANG SATU AKUN — SATU HITUNGAN, BANYAK LAYAR
@@ -76,7 +76,11 @@ export function useRingkasanAkun() {
   /* Setoran & penarikan ikut dihitung, persis seperti di halaman Jurnal, dan
      dibebankan ke sumbernya sendiri: setoran MT5 tidak menaikkan saldo
      kripto. */
-  const { data: arus } = useArusKas();
+  const { data: arusNyata } = useArusKas();
+  /* Arus contoh HANYA menemani riwayat contoh, dan hanya selama orangnya
+     belum mencatat setoran sendiri — lihat catatan `ARUS_CONTOH`. Begitu
+     `contoh` padam, yang dihitung kembali arus miliknya saja. */
+  const arus = pilihArus(contoh, arusNyata);
   const arusForex = arusBersih(arus, 'forex');
   const arusKripto = arusBersih(arus, 'kripto');
   const modalTotal = saldoAwal + arusForex + arusKripto;

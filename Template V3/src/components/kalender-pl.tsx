@@ -49,20 +49,31 @@ interface Buka {
   terkunci: boolean;
 }
 
-export function KalenderPl({ pl, rincian, satuanNol = 'Total bulan ini' }: {
+export function KalenderPl({ pl, rincian, satuanNol = 'Total bulan ini', geserAwal = 0 }: {
   pl: Map<string, number>;
   /** Kunci HARUS sama dengan `pl` — lihat `kunciHari` di lib/hitung.ts. */
   rincian?: Map<string, BarisHari[]>;
   /** Label baris total. Jurnal menyebutnya "Total bulan ini"; halaman lain
    *  boleh menyebutnya lain tanpa perlu menyalin seluruh komponen. */
   satuanNol?: string;
+  /** Bulan yang dibuka PERTAMA KALI, sebagai offset dari bulan berjalan
+   *  (0 = bulan ini, -1 = bulan lalu). Cuma nilai awal — sesudahnya
+   *  orangnya yang memegang kendali lewat panah dan chip bulan.
+   *
+   *  Dipakai jurnal CONTOH di minggu pertama bulan: kalender yang baru
+   *  berisi tiga kotak terbaca "tidak lengkap" (dilaporkan pemilik 3 Okt
+   *  2026), padahal sebelas bulan penuh ada satu klik di sebelahnya. Jurnal
+   *  sungguhan tidak memakainya — di sana bulan berjalan yang masih sepi
+   *  memang keadaannya, dan membukanya di bulan lain berarti menyembunyikan
+   *  hari ini. */
+  geserAwal?: number;
 }) {
   /* Bulan yang sedang dilihat, sebagai offset dari bulan berjalan.
      0 = bulan ini, -1 = bulan lalu. Menyimpan offset, bukan objek Date,
      membuat "maju/mundur satu bulan" tidak perlu memikirkan panjang bulan
      maupun pergantian tahun — Date(tahun, bulan-1, 1) sudah benar sendiri
      bahkan untuk Januari. */
-  const [geserBulan, setGeserBulan] = useState(0);
+  const [geserBulan, setGeserBulan] = useState(geserAwal);
   const [buka, setBuka] = useState<Buka | null>(null);
   const gelembungRef = useRef<HTMLDivElement | null>(null);
   /** Penanda instans ini. Objek kosong sudah cukup — yang dibutuhkan cuma
